@@ -5,6 +5,7 @@ import { Layout } from './components/Layout';
 import { RepositoryProvider } from './data/RepositoryContext';
 import type { Repository } from './data/repository';
 import { LoginPage } from './pages/LoginPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 function Placeholder({ title }: { title: string }) {
   return <h1>{title}</h1>;
@@ -30,7 +31,7 @@ export default function App({ repo }: { repo: Repository }) {
               <Route path="item/:id/edit" element={<Placeholder title="Bearbeiten" />} />
               <Route path="scan" element={<Placeholder title="Scannen" />} />
               <Route path="take/:id" element={<Placeholder title="Entnehmen" />} />
-              <Route path="settings" element={<Placeholder title="Einstellungen" />} />
+              <Route path="settings" element={<SettingsPage />} />
             </Route>
           </Routes>
         </HashRouter>

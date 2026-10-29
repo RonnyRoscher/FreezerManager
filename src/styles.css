@@ -193,3 +193,34 @@ label {
   max-width: 380px;
   padding-top: 15vh;
 }
+
+/* Settings */
+.edit-row,
+.add-row {
+  flex-wrap: nowrap;
+  margin: 0.3rem 0;
+}
+
+.edit-row button,
+.add-row button {
+  padding: 0.45rem 0.7rem;
+}
+
+.months {
+  width: 5rem;
+  flex: none;
+}
+
+.freezer-card {
+  margin-bottom: 0.8rem;
+}
+
+.compartments {
+  margin-left: 1.2rem;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0 0 0.5rem;
+}
