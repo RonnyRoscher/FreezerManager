@@ -283,3 +283,7 @@ label {
     background: #fff;
   }
 }
+
+.two-cols > label {
+  flex: 1 1 12rem;
+}
