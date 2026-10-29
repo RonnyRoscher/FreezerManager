@@ -8,11 +8,9 @@ import { ItemDetailPage } from './pages/ItemDetailPage';
 import { ItemFormPage } from './pages/ItemFormPage';
 import { LoginPage } from './pages/LoginPage';
 import { OverviewPage } from './pages/OverviewPage';
+import { ScanPage } from './pages/ScanPage';
 import { SettingsPage } from './pages/SettingsPage';
-
-function Placeholder({ title }: { title: string }) {
-  return <h1>{title}</h1>;
-}
+import { TakePage } from './pages/TakePage';
 
 export default function App({ repo }: { repo: Repository }) {
   return (
@@ -32,8 +30,8 @@ export default function App({ repo }: { repo: Repository }) {
               <Route path="new" element={<ItemFormPage />} />
               <Route path="item/:id" element={<ItemDetailPage />} />
               <Route path="item/:id/edit" element={<ItemFormPage />} />
-              <Route path="scan" element={<Placeholder title="Scannen" />} />
-              <Route path="take/:id" element={<Placeholder title="Entnehmen" />} />
+              <Route path="scan" element={<ScanPage />} />
+              <Route path="take/:id" element={<TakePage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
           </Routes>

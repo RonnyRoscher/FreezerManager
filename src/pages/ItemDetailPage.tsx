@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { locationText } from '../components/ItemRow';
+import { TakeCard } from '../components/TakeCard';
 import { useRepository } from '../data/RepositoryContext';
 import { formatDate, todayIso } from '../domain/dates';
 import { expiryDate, expiryStatus, formatAge } from '../domain/expiry';
@@ -72,10 +73,8 @@ export function ItemDetailPage() {
         <button type="button" className="secondary" onClick={() => printLabel(item)}>
           Label drucken
         </button>
-        <button type="button" onClick={() => navigate(`/take/${item.id}`)}>
-          Entnehmen
-        </button>
       </div>
+      <TakeCard item={item} showSummary={false} onDone={() => navigate('/')} />
     </>
   );
 }

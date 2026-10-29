@@ -419,3 +419,62 @@ a.button {
   color: var(--accent);
   text-decoration: none;
 }
+
+/* Take & scan */
+.take-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0.8rem 0;
+}
+
+.take-card.removed {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.take-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.take-summary strong {
+  font-size: 1.2rem;
+}
+
+.take-button {
+  font-size: 1.1rem;
+  padding: 0.8rem;
+}
+
+.scanner {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 1;
+  max-height: 55vh;
+  margin: 0 auto;
+}
+
+.scanner-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scan-result {
+  display: flex;
+  flex-direction: column;
+}
+
+.manual {
+  margin-top: 1rem;
+  align-items: flex-end;
+  flex-wrap: nowrap;
+}
+
+.manual label {
+  flex: 1;
+}
