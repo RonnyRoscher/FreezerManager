@@ -287,3 +287,135 @@ label {
 .two-cols > label {
   flex: 1 1 12rem;
 }
+
+/* Overview */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.toolbar > label {
+  flex: 1 1 10rem;
+}
+
+.segmented {
+  display: flex;
+}
+
+.segmented button {
+  background: #fff;
+  color: var(--accent);
+  border-radius: 0;
+}
+
+.segmented button:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.segmented button:last-child {
+  border-radius: 0 8px 8px 0;
+  border-left: none;
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--accent);
+  color: #fff;
+}
+
+.count {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
+.item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.item-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.65rem 0.8rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 6px solid #9fd3a8;
+  border-radius: 10px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.item-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.item-name {
+  font-weight: 600;
+}
+
+.item-quantity,
+.item-meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.item-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.status-soon {
+  border-left-color: var(--soon);
+  background: var(--soon-bg);
+}
+
+.status-overdue {
+  border-left-color: var(--overdue);
+  background: var(--overdue-bg);
+}
+
+.error-box {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* Detail */
+.details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.4rem 1rem;
+  margin: 0 0 1rem;
+  border-left-width: 6px;
+}
+
+.details dt {
+  color: var(--muted);
+}
+
+.details dd {
+  margin: 0;
+}
+
+.code {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+}
+
+a.button {
+  display: inline-block;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+}
