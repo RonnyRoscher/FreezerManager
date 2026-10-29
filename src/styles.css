@@ -225,6 +225,15 @@ label {
   margin: 0 0 0.5rem;
 }
 
+body.demo::before {
+  content: 'Demo-Modus: keine Datenbank verbunden, Änderungen gehen beim Neuladen verloren.';
+  display: block;
+  padding: 0.4rem 1rem;
+  background: var(--soon-bg);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
 /* Label */
 .label {
   display: flex;
@@ -281,6 +290,10 @@ label {
 
   body {
     background: #fff;
+  }
+
+  body.demo::before {
+    display: none;
   }
 }
 
