@@ -36,6 +36,12 @@ export function ScanPage() {
     setResult(null);
   }, [result]);
 
+  // After a removal the scanner is free for the next item while the undo hint stays visible.
+  const released = useCallback(() => {
+    if (result?.kind === 'item') lastClosed.current = { id: result.item.id, at: Date.now() };
+    open.current = false;
+  }, [result]);
+
   const onScan = useCallback(
     (text: string) => {
       const id = parseTakeUrl(text);
@@ -67,7 +73,7 @@ export function ScanPage() {
 
       {result?.kind === 'item' && (
         <div className="scan-result">
-          <TakeCard key={result.item.id} item={result.item} onDone={close} />
+          <TakeCard key={result.item.id} item={result.item} onDone={close} onRemoved={released} />
           <button type="button" className="link-button" onClick={close}>
             Schließen
           </button>

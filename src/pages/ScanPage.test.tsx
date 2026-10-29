@@ -91,3 +91,16 @@ test('falls back to manual entry when the camera is unavailable', async () => {
   expect(await screen.findByText('Kamera nicht verfügbar. Kurzcode manuell eingeben.')).toBeInTheDocument();
   expect(screen.getByLabelText('Kurzcode')).toBeVisible();
 });
+
+test('is ready for the next item right after a removal', async () => {
+  const { repo, url } = await openScanner();
+  const other = await repo.createItem({
+    name: 'Erbsen', details: null, quantity: null,
+    category_id: meat.id, compartment_id: drawer2.id, frozen_at: '2026-01-01',
+  });
+  act(() => scanner.onResult(url));
+  await userEvent.click(await screen.findByRole('button', { name: 'Entnehmen' }));
+  await screen.findByText('Hackfleisch entnommen');
+  act(() => scanner.onResult(buildTakeUrl('https://x.github.io/FreezerManager/', other.id)));
+  expect(await screen.findByText('Erbsen')).toBeInTheDocument();
+});

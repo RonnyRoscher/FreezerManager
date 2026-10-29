@@ -4,7 +4,7 @@ import { useRepository } from '../data/RepositoryContext';
 import { todayIso } from '../domain/dates';
 import type { Category, FreezerWithCompartments, ItemInput } from '../domain/types';
 import { loadFormPrefs, saveFormPrefs } from '../lib/formPrefs';
-import { LOAD_FAILED, NOT_IN_STOCK, SAVE_FAILED } from '../lib/messages';
+import { LOAD_FAILED, NOT_IN_STOCK, PRINT_FAILED, SAVE_FAILED } from '../lib/messages';
 import { printLabel } from '../print/printLabel';
 
 type Fields = {
@@ -127,31 +127,37 @@ export function ItemFormPage() {
     }
     setError('');
     setBusy(true);
+    let saved;
     try {
-      const saved = id
-        ? await repo.updateItem(id, toInput(current))
-        : await repo.createItem(toInput(current));
-      saveFormPrefs({
-        categoryId: current.categoryId,
-        freezerId: current.freezerId,
-        compartmentId: current.compartmentId,
-      });
+      saved = id ? await repo.updateItem(id, toInput(current)) : await repo.createItem(toInput(current));
+    } catch {
+      setError(SAVE_FAILED);
+      setBusy(false);
+      return;
+    }
+    saveFormPrefs({
+      categoryId: current.categoryId,
+      freezerId: current.freezerId,
+      compartmentId: current.compartmentId,
+    });
+    if (!id) {
+      setNotice(`Gespeichert: ${saved.name} (${saved.short_code})`);
+      setFields((prev) => (prev ? { ...prev, ...emptyItemFields } : prev));
+      if (!names.includes(saved.name)) setNames([...names, saved.name].sort((a, b) => a.localeCompare(b, 'de')));
+    }
+    // The item is stored at this point; a print problem must not look like a failed save.
+    try {
       if (print) {
         const view = await repo.getItem(saved.id);
         if (view) await printLabel(view);
       }
-      if (id) {
-        navigate(`/item/${id}`);
-        return;
-      }
-      setNotice(`Gespeichert: ${saved.name} (${saved.short_code})`);
-      setFields({ ...current, ...emptyItemFields });
-      if (!names.includes(saved.name)) setNames([...names, saved.name].sort((a, b) => a.localeCompare(b, 'de')));
     } catch {
-      setError(SAVE_FAILED);
-    } finally {
+      setError(PRINT_FAILED);
       setBusy(false);
+      return;
     }
+    setBusy(false);
+    if (id) navigate(`/item/${id}`);
   }
 
   function submit(e: FormEvent) {

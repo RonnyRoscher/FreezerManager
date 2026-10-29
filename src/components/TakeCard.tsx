@@ -12,12 +12,19 @@ type State =
   | { kind: 'removed'; removed: Item }
   | { kind: 'done' }
   | { kind: 'gone' }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string }
+  | { kind: 'undo-error'; removed: Item };
 
-type Props = { item: ItemView; onDone?: () => void; showSummary?: boolean };
+type Props = {
+  item: ItemView;
+  onDone?: () => void;
+  /** Called as soon as the item is removed (before the undo window ends). */
+  onRemoved?: () => void;
+  showSummary?: boolean;
+};
 
 /** Confirms removal of an item and offers a short-lived undo. */
-export function TakeCard({ item, onDone, showSummary = true }: Props) {
+export function TakeCard({ item, onDone, onRemoved, showSummary = true }: Props) {
   const repo = useRepository();
   const [state, setState] = useState<State>({ kind: 'confirm' });
 
@@ -35,6 +42,7 @@ export function TakeCard({ item, onDone, showSummary = true }: Props) {
     try {
       const removed = await repo.removeItem(item.id);
       setState(removed ? { kind: 'removed', removed } : { kind: 'gone' });
+      if (removed) onRemoved?.();
     } catch {
       setState({ kind: 'error', message: SAVE_FAILED });
     }
@@ -46,7 +54,7 @@ export function TakeCard({ item, onDone, showSummary = true }: Props) {
       await repo.restoreItem(removed);
       setState({ kind: 'confirm', notice: 'Rückgängig gemacht' });
     } catch {
-      setState({ kind: 'error', message: SAVE_FAILED });
+      setState({ kind: 'undo-error', removed });
     }
   }
 
@@ -56,6 +64,18 @@ export function TakeCard({ item, onDone, showSummary = true }: Props) {
     return (
       <div className="card take-card removed" role="status">
         {item.name} entnommen
+      </div>
+    );
+  }
+
+  if (state.kind === 'undo-error') {
+    return (
+      <div className="card take-card" role="status">
+        <span>{item.name} entnommen</span>
+        <p className="error">{SAVE_FAILED}</p>
+        <button type="button" className="secondary" onClick={() => undo(state.removed)}>
+          Rückgängig erneut versuchen
+        </button>
       </div>
     );
   }

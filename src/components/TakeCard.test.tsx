@@ -75,3 +75,18 @@ test('reports a failed removal and keeps the button', async () => {
   expect(await screen.findByText('Speichern fehlgeschlagen. Bitte Verbindung prüfen.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Entnehmen' })).toBeInTheDocument();
 });
+
+test('keeps the removed item when undo fails and allows a retry', async () => {
+  let failRestore = true;
+  const { repo, item } = await setup((r) => ({
+    ...r,
+    restoreItem: async (i) => (failRestore ? Promise.reject(new Error('offline')) : r.restoreItem(i)),
+  }));
+  await user().click(screen.getByRole('button', { name: 'Entnehmen' }));
+  await user().click(await screen.findByRole('button', { name: 'Rückgängig' }));
+  expect(await screen.findByText('Speichern fehlgeschlagen. Bitte Verbindung prüfen.')).toBeInTheDocument();
+  failRestore = false;
+  await user().click(screen.getByRole('button', { name: 'Rückgängig erneut versuchen' }));
+  await screen.findByText('Rückgängig gemacht');
+  expect(await repo.getItem(item.id)).not.toBeNull();
+});

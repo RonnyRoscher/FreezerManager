@@ -117,3 +117,14 @@ test('edits an existing item and returns to its detail page', async () => {
   await vi.waitFor(() => expect(window.location.hash).toBe(`#/item/${item.id}`));
   expect((await repo.getItem(item.id))?.name).toBe('Rinderhack');
 });
+
+test('a failed print after saving does not report the save as failed', async () => {
+  vi.mocked(printLabel).mockRejectedValueOnce(new Error('print'));
+  const repo = await openForm();
+  await fillRequired('Gulasch');
+  await userEvent.click(screen.getByRole('button', { name: 'Speichern & Label drucken' }));
+  expect(await screen.findByText('Gespeichert, aber Drucken fehlgeschlagen.')).toBeInTheDocument();
+  expect(screen.queryByText('Speichern fehlgeschlagen. Bitte Verbindung prüfen.')).toBeNull();
+  expect(screen.getByLabelText('Name')).toHaveValue('');
+  expect(await repo.listItems()).toHaveLength(1);
+});

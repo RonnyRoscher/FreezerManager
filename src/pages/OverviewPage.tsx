@@ -36,7 +36,18 @@ export function OverviewPage() {
 
   useEffect(() => {
     load();
-    return repo.subscribeItems(load);
+    // Live events missed while the device slept or was offline are not replayed.
+    const reloadIfVisible = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    document.addEventListener('visibilitychange', reloadIfVisible);
+    window.addEventListener('online', load);
+    const unsubscribe = repo.subscribeItems(load);
+    return () => {
+      document.removeEventListener('visibilitychange', reloadIfVisible);
+      window.removeEventListener('online', load);
+      unsubscribe();
+    };
   }, [repo, load]);
 
   const visible = useMemo(

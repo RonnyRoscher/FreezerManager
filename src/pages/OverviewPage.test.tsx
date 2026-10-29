@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderApp, seededRepository } from '../test/renderApp';
 import { drawer2, kitchen, meat, top, veg } from '../test/fixtures';
@@ -92,4 +92,17 @@ test('offers a retry when loading fails', async () => {
   fail = false;
   await userEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }));
   expect(await screen.findByText('Noch nichts eingefroren.')).toBeInTheDocument();
+});
+
+test('reloads when the app becomes visible again (missed live events)', async () => {
+  const base = seededRepository();
+  await base.createItem(mince);
+  const repo = { ...base, subscribeItems: () => () => undefined };
+  renderApp('#/', repo);
+  await screen.findByText('Hackfleisch');
+  await base.createItem(peas);
+  act(() => {
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  expect(await screen.findByText('Erbsen')).toBeInTheDocument();
 });

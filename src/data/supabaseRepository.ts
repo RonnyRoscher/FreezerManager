@@ -102,10 +102,14 @@ export function createSupabaseRepository(client: SupabaseClient): Repository {
       check(await client.from('items').insert(item));
     },
     subscribeItems(onChange) {
+      // Unique topic: a channel with the same name may still be leaving after a quick remount.
       const channel = client
-        .channel('items-changes')
+        .channel(`items-changes-${crypto.randomUUID()}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, () => onChange())
-        .subscribe();
+        // Reload after every (re)join, since events during a disconnect are lost.
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') onChange();
+        });
       return () => {
         client.removeChannel(channel);
       };
