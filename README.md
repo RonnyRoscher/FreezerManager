@@ -28,6 +28,14 @@ Design und Plan: `docs/superpowers/specs/` und `docs/superpowers/plans/`.
    damit sich niemand sonst registrieren kann.
 5. **Project Settings › API**: `Project URL` und den `anon public` Key notieren.
    Der anon Key darf öffentlich sein – ohne Login gibt die Datenbank nichts heraus.
+6. **Authentication › URL Configuration**:
+   - **Site URL** auf `https://<github-name>.github.io/FreezerManager/` setzen
+     (Standard ist `http://localhost:3000` – dann führen alle E-Mail-Links ins Leere).
+   - Dieselbe Adresse unter **Redirect URLs** hinzufügen.
+
+   Erst dann funktionieren Magic Link, „Passwort vergessen?“ und Einladungen.
+   Ein Link aus einer Passwort-Zurücksetzen-Mail öffnet in der App die Seite
+   „Neues Passwort“.
 
 ### 2. GitHub Pages
 
@@ -52,6 +60,17 @@ Gedruckt wird über den normalen Druckdialog des Browsers, ein Label pro Druck.
 Seite im Browser öffnen, anmelden und **„Zum Startbildschirm hinzufügen“** wählen
 (Safari: Teilen-Menü; Chrome: Menü ⋮). Die App startet dann wie eine normale App.
 Der Kamerazugriff funktioniert nur über HTTPS – GitHub Pages erfüllt das.
+
+### Anmeldung klappt nicht?
+
+- **„E-Mail oder Passwort falsch.“** – In der App unter „Passwort vergessen?“ einen Link
+  anfordern (oder in Supabase unter Authentication › Users beim Nutzer „Send password
+  recovery“) und ein neues Passwort setzen.
+- **„Die E-Mail-Adresse ist noch nicht bestätigt.“** – In Supabase unter
+  Authentication › Users den Nutzer öffnen und bestätigen („Confirm email“), oder den
+  Nutzer mit „Auto Confirm User“ neu anlegen.
+- **„Der Link ist abgelaufen oder wurde schon benutzt.“** – Links gelten nur einmal und
+  nur kurz. Einen neuen anfordern und nur einmal anklicken.
 
 ## Lokale Entwicklung
 

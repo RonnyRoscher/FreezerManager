@@ -53,6 +53,8 @@ export function createMemoryRepository(seed: MemorySeed = {}): Repository {
     async signOut() {
       setSession(null);
     },
+    async updatePassword() {},
+    async sendPasswordReset() {},
     onAuthChange(cb) {
       authListeners.add(cb);
       return () => authListeners.delete(cb);

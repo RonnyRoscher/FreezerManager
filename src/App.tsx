@@ -1,4 +1,4 @@
-import { HashRouter, Route, Routes } from 'react-router-dom';
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
 import { Layout } from './components/Layout';
@@ -9,16 +9,17 @@ import { ItemFormPage } from './pages/ItemFormPage';
 import { LoginPage } from './pages/LoginPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { ScanPage } from './pages/ScanPage';
+import { SetPasswordPage } from './pages/SetPasswordPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { TakePage } from './pages/TakePage';
 
-export default function App({ repo }: { repo: Repository }) {
+export default function App({ repo, authMessage }: { repo: Repository; authMessage?: string }) {
   return (
     <RepositoryProvider repo={repo}>
       <AuthProvider>
         <HashRouter>
           <Routes>
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/login" element={<LoginPage authMessage={authMessage} />} />
             <Route
               element={
                 <RequireAuth>
@@ -33,6 +34,8 @@ export default function App({ repo }: { repo: Repository }) {
               <Route path="scan" element={<ScanPage />} />
               <Route path="take/:id" element={<TakePage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="passwort" element={<SetPasswordPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
         </HashRouter>

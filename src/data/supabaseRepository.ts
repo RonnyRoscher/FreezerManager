@@ -1,4 +1,5 @@
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
+import { appBaseUrl } from '../domain/qrUrl';
 import { normalizeShortCode } from '../domain/shortCode';
 import type { Category, Compartment, Freezer, Item, ItemView } from '../domain/types';
 import { createWithShortCode } from './createWithShortCode';
@@ -58,6 +59,14 @@ export function createSupabaseRepository(client: SupabaseClient): Repository {
     },
     async signOut() {
       await client.auth.signOut();
+    },
+    async updatePassword(password) {
+      const { error } = await client.auth.updateUser({ password });
+      if (error) throw error;
+    },
+    async sendPasswordReset(email) {
+      const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: appBaseUrl() });
+      if (error) throw error;
     },
     onAuthChange(cb) {
       const { data } = client.auth.onAuthStateChange((_event, session) => cb(toSession(session)));

@@ -34,6 +34,8 @@ export interface Repository {
   signIn(email: string, password: string): Promise<void>;
   signOut(): Promise<void>;
   onAuthChange(cb: (s: Session) => void): () => void;
+  updatePassword(password: string): Promise<void>;
+  sendPasswordReset(email: string): Promise<void>;
 
   listItems(): Promise<ItemView[]>;
   getItem(id: string): Promise<ItemView | null>;
