@@ -40,7 +40,7 @@ Design und Plan: `docs/superpowers/specs/` und `docs/superpowers/plans/`.
 ### 2. GitHub Pages
 
 1. Im Repository unter **Settings › Secrets and variables › Actions** zwei Secrets anlegen:
-   - `VITE_SUPABASE_URL` = Project URL
+   - `VITE_SUPABASE_URL` = Project URL, nur `https://<projekt>.supabase.co` – ohne `/rest/v1/`
    - `VITE_SUPABASE_ANON_KEY` = anon public Key
 2. **Settings › Pages › Source**: „GitHub Actions“ wählen.
 3. Auf `main` pushen (oder den Workflow „Deploy to GitHub Pages“ manuell starten).
