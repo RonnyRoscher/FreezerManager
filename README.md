@@ -63,6 +63,22 @@ dafür nicht gebraucht.
 - „Label drucken“ (Detailseite) und „Speichern & Label drucken“ (Einfrieren) drucken sofort,
   ohne Druckdialog.
 
+#### Am Android-Handy per Bluetooth
+
+Am Android-Handy druckt die App per **Bluetooth** auf denselben Drucker (Chrome, auch als
+installierte App). Einrichten muss man nichts:
+
+- Bluetooth am Handy einschalten (manche Android-Versionen verlangen zusätzlich **Standort**).
+- Beim **ersten Druck nach dem Öffnen der App** erscheint eine Auswahl: den Drucker „T0…“
+  wählen. Danach druckt jeder Tipp sofort, solange die App offen ist. Chrome merkt sich den
+  Drucker nicht über einen Neustart der App hinaus.
+- Bricht die Verbindung ab (Drucker aus, App im Hintergrund), verbindet sich der nächste Druck
+  ohne erneute Auswahl.
+- Der Drucker spricht immer nur mit einem Gerät: Katasymbol-App schließen und nicht
+  gleichzeitig per USB am PC verbinden.
+- Einen anderen Drucker wählen: **Einstellungen › Drucker › Trennen**, dann neu drucken.
+- **iPhone:** Safari unterstützt kein Bluetooth für Webseiten – dort nur „Auf Papier drucken“.
+
 #### Notlösung: auf Papier drucken
 
 Ohne Etikettendrucker (oder am Handy) auf der Detailseite **„Auf Papier drucken“** wählen.
@@ -111,6 +127,9 @@ Kamera und Drucker lassen sich nicht automatisiert testen. Nach dem ersten Deplo
 - [ ] Drucker-USB-Kabel ziehen → Einstellungen zeigen „Nicht verbunden“; wieder einstecken →
       „Verbunden“, ohne Klick. Seite neu laden → verbindet sich von selbst.
 - [ ] „Auf Papier drucken“ → A4 mit Etikett in Originalgröße und Schnittlinie.
+- [ ] Am Android-Handy nach dem Öffnen der App „Label drucken“ → Druckerauswahl, Etikett kommt
+      heraus; zweiter Druck ohne Auswahl.
+- [ ] Drucker aus- und wieder einschalten, dann am Handy drucken → verbindet sich neu, druckt.
 - [ ] Label mit der **normalen Kamera-App** des Handys scannen → Entnahme-Seite öffnet sich.
 - [ ] In der App unter **Scannen** ein Label scannen → Karte erscheint, „Entnehmen“ funktioniert,
       „Rückgängig“ stellt den Eintrag wieder her.

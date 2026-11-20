@@ -1,8 +1,0 @@
-body { font-family: system-ui, sans-serif; margin: 0; background: #f4f7fa; color: #1d2733; }
-.spike { max-width: 700px; margin: 0 auto; padding: 1rem; }
-.hint { background: #fff7dc; padding: 0.6rem 0.8rem; border-radius: 8px; }
-button { font: inherit; padding: 0.7rem 1rem; border-radius: 8px; border: 1px solid #1f6feb; background: #1f6feb; color: #fff; margin: 0.2rem 0.4rem 0.2rem 0; }
-button:disabled { opacity: 0.5; }
-input { font: inherit; width: 4rem; }
-canvas { border: 1px solid #999; image-rendering: pixelated; width: 100%; max-width: 320px; }
-pre { background: #111; color: #cfe; padding: 0.8rem; border-radius: 8px; max-height: 50vh; overflow: auto; font-size: 0.75rem; white-space: pre-wrap; }
