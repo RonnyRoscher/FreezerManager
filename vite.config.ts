@@ -26,9 +26,19 @@ export default defineConfig({
         ],
       },
       // Only the app shell is cached; data always comes live from Supabase.
-      workbox: { globPatterns: ['**/*.{js,css,html,png,svg}'], runtimeCaching: [] },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,png,svg}'],
+        runtimeCaching: [],
+        navigateFallbackDenylist: [/druck-test/],
+      },
     }),
   ],
+  build: {
+    rollupOptions: {
+      // druck-test-bt.html: throwaway spike page for Bluetooth printing from the phone.
+      input: { main: 'index.html', drucktestbt: 'druck-test-bt.html' },
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,

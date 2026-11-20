@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Drucker-Test (Bluetooth)</title>
+  </head>
+  <body>
+    <main class="spike">
+      <h1>Drucker-Test: Bluetooth</h1>
+      <p class="hint">
+        Wegwerf-Testseite. Am Android-Handy in <b>Chrome</b> öffnen. Bluetooth und Standort am
+        Handy einschalten, Drucker einschalten. Die Katasymbol-App vorher ganz schließen, und den
+        Drucker <b>nicht</b> per USB am PC verbunden lassen.
+      </p>
+      <p>
+        <button id="connect">1. Drucker verbinden</button>
+        <button id="status" disabled>2. Status lesen</button>
+      </p>
+      <p>
+        <label>Dichte (1–9) <input id="density" type="number" value="4" min="1" max="9" /></label>
+      </p>
+      <p><button id="print" disabled>3. Testetikett drucken</button></p>
+      <canvas id="preview"></canvas>
+      <h2>Protokoll</h2>
+      <pre id="log"></pre>
+    </main>
+    <script type="module" src="/src/spike/btTest.ts"></script>
+  </body>
+</html>
