@@ -26,19 +26,9 @@ export default defineConfig({
         ],
       },
       // Only the app shell is cached; data always comes live from Supabase.
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg}'],
-        runtimeCaching: [],
-        navigateFallbackDenylist: [/druck-test/],
-      },
+      workbox: { globPatterns: ['**/*.{js,css,html,png,svg}'], runtimeCaching: [] },
     }),
   ],
-  build: {
-    rollupOptions: {
-      // druck-test.html: throwaway spike page for direct USB printing.
-      input: { main: 'index.html', drucktest: 'druck-test.html' },
-    },
-  },
   test: {
     environment: 'jsdom',
     globals: true,

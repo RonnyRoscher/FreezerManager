@@ -1,2 +1,3 @@
 Vendored from https://github.com/khromov/supvan-katasymbol-printer-web-ui (src/lib/printer), MIT, commit:
 fd7b53e1514d731fceff2a8bb0a6998c3fd65513 Wed Oct 28 13:14:59 2026 +0100
+devices.ts: only the t5080 rows of src/lib/printer/devices.ts at the same commit.
