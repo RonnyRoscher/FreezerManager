@@ -48,15 +48,24 @@ Design und Plan: `docs/superpowers/specs/` und `docs/superpowers/plans/`.
 
 ### 3. Etikettendrucker
 
-Gedruckt wird über den normalen Druckdialog des Browsers, ein Label pro Druck.
+Die App druckt direkt per USB auf Katasymbol-/Supvan-Etikettendrucker der T50/T80-Reihe
+(getestet: Katasymbol T50M Pro mit 40 × 30 mm-Etiketten). Der Windows-Druckertreiber wird
+dafür nicht gebraucht.
 
-- Im Druckertreiber (bzw. im Druckdialog) das Papierformat auf das Etikett stellen,
-  Standard ist **62 × 29 mm** (z. B. Brother DK-11209).
-- Ränder: **Keine**, Skalierung: **100 %**, Kopf-/Fußzeilen aus.
-- Andere Etiketten (z. B. Dymo, Katasymbol 40 × 30 mm): Größe in der App unter
-  **Einstellungen › Label** anpassen. Die Größe in der App und das Papierformat im
-  Druckdialog müssen übereinstimmen.
-- Im Druckdialog den Etikettendrucker als Ziel wählen, Papierformat = Etikettengröße.
+- Nur in **Chrome oder Edge am PC**, Drucker per **USB-Kabel** angeschlossen.
+- Einmalig unter **Einstellungen › Drucker** auf „Drucker verbinden“ klicken und den Drucker
+  auswählen. Danach verbindet sich die App bei jedem Start von selbst.
+- Die Etikettengröße liest die App aus der eingelegten Rolle.
+- Ist das Etikett zu blass oder zu dunkel: **Druckdichte** (1–9, Standard 4) anpassen.
+- Die Katasymbol-App beim Drucken schließen, sonst ist der Drucker belegt.
+- „Label drucken“ (Detailseite) und „Speichern & Label drucken“ (Einfrieren) drucken sofort,
+  ohne Druckdialog.
+
+#### Notlösung: auf Papier drucken
+
+Ohne Etikettendrucker (oder am Handy) auf der Detailseite **„Auf Papier drucken“** wählen.
+Das Etikett kommt in Originalgröße oben links auf ein A4-Blatt, mit gestrichelter
+Schnittlinie zum Ausschneiden. Im Druckdialog Ränder „Standard“ und Skalierung **100 %**.
 
 ### 4. Handy
 
@@ -95,7 +104,11 @@ npm run build    # Typprüfung + Produktions-Build nach dist/
 
 Kamera und Drucker lassen sich nicht automatisiert testen. Nach dem ersten Deployment:
 
-- [ ] Einfrieren am PC mit „Speichern & Label drucken“ → genau ein Label, richtig skaliert.
+- [ ] Einfrieren am PC mit „Speichern & Label drucken“ → Etikett kommt sofort aus dem
+      Etikettendrucker, lesbar und richtig herum.
+- [ ] Drucker-USB-Kabel ziehen → Einstellungen zeigen „Nicht verbunden“; wieder einstecken →
+      „Verbunden“, ohne Klick. Seite neu laden → verbindet sich von selbst.
+- [ ] „Auf Papier drucken“ → A4 mit Etikett in Originalgröße und Schnittlinie.
 - [ ] Label mit der **normalen Kamera-App** des Handys scannen → Entnahme-Seite öffnet sich.
 - [ ] In der App unter **Scannen** ein Label scannen → Karte erscheint, „Entnehmen“ funktioniert,
       „Rückgängig“ stellt den Eintrag wieder her.
