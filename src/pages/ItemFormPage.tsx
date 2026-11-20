@@ -4,8 +4,10 @@ import { useRepository } from '../data/RepositoryContext';
 import { todayIso } from '../domain/dates';
 import type { Category, FreezerWithCompartments, ItemInput } from '../domain/types';
 import { loadFormPrefs, saveFormPrefs } from '../lib/formPrefs';
-import { LOAD_FAILED, NOT_IN_STOCK, PRINT_FAILED, SAVE_FAILED } from '../lib/messages';
-import { printLabel } from '../print/printLabel';
+import { PrinterHint } from '../components/PrinterHint';
+import { LOAD_FAILED, NOT_IN_STOCK, SAVE_FAILED } from '../lib/messages';
+import { printerErrorMessage } from '../printer/printerMessages';
+import { usePrinter } from '../printer/PrinterContext';
 
 type Fields = {
   name: string;
@@ -64,6 +66,8 @@ export function ItemFormPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const printer = usePrinter();
 
   useEffect(() => {
     let active = true;
@@ -146,15 +150,18 @@ export function ItemFormPage() {
       if (!names.includes(saved.name)) setNames([...names, saved.name].sort((a, b) => a.localeCompare(b, 'de')));
     }
     // The item is stored at this point; a print problem must not look like a failed save.
-    try {
-      if (print) {
+    if (print) {
+      setPrinting(true);
+      try {
         const view = await repo.getItem(saved.id);
-        if (view) await printLabel(view);
+        if (view) await printer.print(view);
+      } catch (e) {
+        setError(`Gespeichert, aber Drucken fehlgeschlagen: ${printerErrorMessage(e).replace(/^Drucken fehlgeschlagen: /, '')}`);
+        setBusy(false);
+        setPrinting(false);
+        return;
       }
-    } catch {
-      setError(PRINT_FAILED);
-      setBusy(false);
-      return;
+      setPrinting(false);
     }
     setBusy(false);
     if (id) navigate(`/item/${id}`);
@@ -251,10 +258,16 @@ export function ItemFormPage() {
           <button type="submit" disabled={busy}>
             Speichern
           </button>
-          <button type="button" className="secondary" disabled={busy} onClick={() => save(true)}>
-            Speichern & Label drucken
+          <button
+            type="button"
+            className="secondary"
+            disabled={busy || printer.state.status !== 'ready'}
+            onClick={() => save(true)}
+          >
+            {printing ? 'Druckt …' : 'Speichern & Label drucken'}
           </button>
         </div>
+        <PrinterHint state={printer.state} />
       </form>
     </>
   );

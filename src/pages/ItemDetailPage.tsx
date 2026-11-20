@@ -7,7 +7,9 @@ import { formatDate, todayIso } from '../domain/dates';
 import { expiryDate, expiryStatus, formatAge } from '../domain/expiry';
 import type { ItemView } from '../domain/types';
 import { LOAD_FAILED, NOT_IN_STOCK } from '../lib/messages';
-import { printLabel } from '../print/printLabel';
+import { PrinterHint } from '../components/PrinterHint';
+import { printerErrorMessage } from '../printer/printerMessages';
+import { usePrinter } from '../printer/PrinterContext';
 
 export function ItemDetailPage() {
   const repo = useRepository();
@@ -15,6 +17,9 @@ export function ItemDetailPage() {
   const { id = '' } = useParams();
   const [item, setItem] = useState<ItemView | null | undefined>(undefined);
   const [error, setError] = useState('');
+  const printer = usePrinter();
+  const [printing, setPrinting] = useState(false);
+  const [printError, setPrintError] = useState('');
 
   useEffect(() => {
     repo
@@ -70,10 +75,27 @@ export function ItemDetailPage() {
         <Link className="button secondary" to={`/item/${item.id}/edit`}>
           Bearbeiten
         </Link>
-        <button type="button" className="secondary" onClick={() => printLabel(item)}>
-          Label drucken
+        <button
+          type="button"
+          className="secondary"
+          disabled={printer.state.status !== 'ready' || printing}
+          onClick={async () => {
+            setPrinting(true);
+            setPrintError('');
+            try {
+              await printer.print(item);
+            } catch (e) {
+              setPrintError(printerErrorMessage(e));
+            } finally {
+              setPrinting(false);
+            }
+          }}
+        >
+          {printing ? 'Druckt …' : 'Label drucken'}
         </button>
       </div>
+      <PrinterHint state={printer.state} />
+      {printError && <p className="error">{printError}</p>}
       <TakeCard item={item} showSummary={false} onDone={() => navigate('/')} />
     </>
   );

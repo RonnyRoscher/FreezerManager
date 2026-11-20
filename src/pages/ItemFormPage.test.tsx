@@ -1,14 +1,14 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { printLabel } from '../print/printLabel';
+import { fakePrinter } from '../test/fakePrinter';
+import { PrinterUserError } from '../printer/printerMessages';
+import type { Printer } from '../printer/printerService';
 import { renderApp, seededRepository } from '../test/renderApp';
 import { cellar, drawer2, kitchen, meat, top, veg } from '../test/fixtures';
 import { todayIso } from '../domain/dates';
 
-vi.mock('../print/printLabel', () => ({ printLabel: vi.fn(async () => undefined) }));
-
-async function openForm(repo = seededRepository()) {
-  renderApp('#/new', repo);
+async function openForm(repo = seededRepository(), printer: Printer = fakePrinter()) {
+  renderApp('#/new', repo, printer);
   await screen.findByRole('heading', { name: 'Einfrieren' });
   await screen.findByRole('option', { name: 'Fleisch' });
   return repo;
@@ -82,11 +82,12 @@ test('suggests names from existing items', async () => {
 });
 
 test('"Speichern & Label drucken" prints the new item', async () => {
-  await openForm();
+  const printer = fakePrinter();
+  await openForm(seededRepository(), printer);
   await fillRequired('Gulasch');
   await userEvent.click(screen.getByRole('button', { name: 'Speichern & Label drucken' }));
   await screen.findByText(/Gespeichert: Gulasch/);
-  expect(printLabel).toHaveBeenCalledWith(expect.objectContaining({ name: 'Gulasch', freezer: cellar }));
+  expect(printer.print).toHaveBeenCalledWith(expect.objectContaining({ name: 'Gulasch', freezer: cellar }));
 });
 
 test('keeps all input when saving fails', async () => {
@@ -119,12 +120,24 @@ test('edits an existing item and returns to its detail page', async () => {
 });
 
 test('a failed print after saving does not report the save as failed', async () => {
-  vi.mocked(printLabel).mockRejectedValueOnce(new Error('print'));
-  const repo = await openForm();
+  const printer = fakePrinter();
+  printer.print.mockRejectedValueOnce(new PrinterUserError('Der Deckel des Druckers ist offen.'));
+  const repo = await openForm(seededRepository(), printer);
   await fillRequired('Gulasch');
   await userEvent.click(screen.getByRole('button', { name: 'Speichern & Label drucken' }));
-  expect(await screen.findByText('Gespeichert, aber Drucken fehlgeschlagen.')).toBeInTheDocument();
+  expect(
+    await screen.findByText('Gespeichert, aber Drucken fehlgeschlagen: Der Deckel des Druckers ist offen.'),
+  ).toBeInTheDocument();
   expect(screen.queryByText('Speichern fehlgeschlagen. Bitte Verbindung prüfen.')).toBeNull();
   expect(screen.getByLabelText('Name')).toHaveValue('');
+  expect(await repo.listItems()).toHaveLength(1);
+});
+
+test('saves without a printer but cannot print', async () => {
+  const repo = await openForm(seededRepository(), fakePrinter({ status: 'unsupported' }));
+  expect(screen.getByRole('button', { name: 'Speichern & Label drucken' })).toBeDisabled();
+  await fillRequired();
+  await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+  await screen.findByText(/Gespeichert: Hackfleisch/);
   expect(await repo.listItems()).toHaveLength(1);
 });
