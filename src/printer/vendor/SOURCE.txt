@@ -2,3 +2,4 @@ Vendored from https://github.com/khromov/supvan-katasymbol-printer-web-ui (src/l
 fd7b53e1514d731fceff2a8bb0a6998c3fd65513 Wed Oct 28 13:14:59 2026 +0100
 devices.ts: only the t5080 rows of src/lib/printer/devices.ts at the same commit.
 ble.ts, serial.ts, families/t5080-bt.ts: unchanged, same commit (Bluetooth spike).
+devices.ts: BT_NAME_PREFIXES (T50 rows, lines 151-159) for bluetoothModelName.

@@ -38,3 +38,26 @@ export const T5080_MODELS: DeviceModel[] = [
 export function findT5080Model(productId: number): DeviceModel | undefined {
   return T5080_MODELS.find((m) => m.productId === productId);
 }
+
+/**
+ * Bluetooth name prefixes of the T50 printers (BT_NAME_PREFIXES of the original devices.ts, from
+ * the Katasymbol Android app's device tables). All of them have a 384-dot head. The name is the
+ * prefix plus a serial, e.g. "T0205C260729L704".
+ */
+const BT_NAME_PREFIXES: [string, string][] = [
+  ...['T0096A', 'T0117A', 'T0118A', 'T0129A', 'T0147B', 'T0148', 'T0170', 'T0178', 'T0205', 'T0211', 'T0212', 'T0213', 'T0221', 'T0162B', 'T0163B', 'T0112A', 'T0101A'].map(
+    (p) => [p, 'T50M Pro'] as [string, string],
+  ),
+  ...['T0046A', 'T0149B', 'T0159B', 'T0200', 'T0100A', 'T0145B', 'T0150B', 'T0201', 'T0151B', 'T0113A', 'T0152B', 'T0160B', 'T0202'].map(
+    (p) => [p, 'T50 Pro'] as [string, string],
+  ),
+  ...['T0097A', 'T0153B', 'T0161B', 'T0206', 'T0154B', 'T0114A', 'T0146B', 'T0155B', 'T0115A', 'T0156B'].map(
+    (p) => [p, 'A50 Pro'] as [string, string],
+  ),
+];
+
+/** Model name for a T50 printer's Bluetooth name; undefined for any other printer. */
+export function bluetoothModelName(name: string | undefined): string | undefined {
+  if (!name) return undefined;
+  return BT_NAME_PREFIXES.find(([prefix]) => name.startsWith(prefix))?.[1];
+}
