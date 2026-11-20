@@ -83,3 +83,15 @@ test('prints on paper in the size of the connected roll', async () => {
   await userEvent.click(await screen.findByRole('button', { name: 'Auf Papier drucken' }));
   expect(printOnPaper).toHaveBeenLastCalledWith(expect.objectContaining({ id: item.id }), { lengthMm: 50, widthMm: 30 });
 });
+
+test('prints over Bluetooth without connecting in the settings first', async () => {
+  const { repo, item } = await itemInRepo();
+  const printer = fakePrinter({ status: 'disconnected', connectOnPrint: true });
+  renderApp(`#/item/${item.id}`, repo, printer);
+  const button = await screen.findByRole('button', { name: 'Label drucken' });
+  expect(button).toBeEnabled();
+  expect(screen.queryByRole('link', { name: 'Drucker in den Einstellungen verbinden' })).toBeNull();
+  await userEvent.click(button);
+  expect(printer.print).toHaveBeenCalledWith(expect.objectContaining({ id: item.id }));
+  expect(document.querySelector('.error')).toBeNull();
+});

@@ -9,6 +9,7 @@ import type { ItemView } from '../domain/types';
 import { LOAD_FAILED, NOT_IN_STOCK } from '../lib/messages';
 import { PrinterHint } from '../components/PrinterHint';
 import { printerErrorMessage } from '../printer/printerMessages';
+import { canPrint } from '../printer/printerService';
 import { usePrinter } from '../printer/PrinterContext';
 import { PAPER_FALLBACK_SIZE, printOnPaper } from '../print/printOnPaper';
 
@@ -79,7 +80,7 @@ export function ItemDetailPage() {
         <button
           type="button"
           className="secondary"
-          disabled={printer.state.status !== 'ready' || printing}
+          disabled={!canPrint(printer.state) || printing}
           onClick={async () => {
             setPrinting(true);
             setPrintError('');

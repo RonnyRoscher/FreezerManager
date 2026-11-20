@@ -4,6 +4,7 @@ import type { Category, FreezerWithCompartments } from '../domain/types';
 import { errorMessage, LOAD_FAILED } from '../lib/messages';
 import { loadDensity, saveDensity } from '../printer/density';
 import { usePrinter } from '../printer/PrinterContext';
+import { printerErrorMessage } from '../printer/printerMessages';
 import { UNSUPPORTED_MESSAGE } from '../printer/printerService';
 
 type Message = { text: string; error: boolean } | null;
@@ -109,6 +110,16 @@ function PrinterSettings() {
   const { state, connect, disconnect } = usePrinter();
   const [density, setDensity] = useState(loadDensity);
   const [saved, setSaved] = useState(false);
+  const [connectError, setConnectError] = useState('');
+
+  async function connectPrinter() {
+    setConnectError('');
+    try {
+      await connect();
+    } catch (e) {
+      setConnectError(printerErrorMessage(e));
+    }
+  }
 
   function saveDensityForm(e: FormEvent) {
     e.preventDefault();
@@ -126,14 +137,18 @@ function PrinterSettings() {
         ) : (
           <>
             <p>{printerSummary(state)}</p>
+            {state.status === 'disconnected' && state.connectOnPrint && (
+              <p className="hint">Per Bluetooth. Nach dem Öffnen der App beim ersten Druck den Drucker einmal auswählen.</p>
+            )}
             {state.status === 'error' && <p className="error">{state.message}</p>}
+            {connectError && <p className="error">{connectError}</p>}
             <div className="row">
               {state.status === 'ready' || state.status === 'printing' ? (
                 <button type="button" className="secondary" onClick={() => void disconnect()}>
                   Trennen
                 </button>
               ) : (
-                <button type="button" disabled={state.status === 'connecting'} onClick={() => void connect()}>
+                <button type="button" disabled={state.status === 'connecting'} onClick={() => void connectPrinter()}>
                   Drucker verbinden
                 </button>
               )}

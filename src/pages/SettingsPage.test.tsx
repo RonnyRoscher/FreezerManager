@@ -4,6 +4,7 @@ import { renderApp, seededRepository } from '../test/renderApp';
 import { drawer2, meat } from '../test/fixtures';
 import { loadDensity } from '../printer/density';
 import { fakePrinter } from '../test/fakePrinter';
+import { PrinterUserError } from '../printer/printerMessages';
 import type { PrinterState } from '../printer/printerService';
 
 const item = (id: string) => ({
@@ -137,4 +138,15 @@ test('stores the print density', async () => {
 test('no longer asks for a label size', async () => {
   await openPrinterSettings();
   expect(screen.queryByLabelText('Breite (mm)')).toBeNull();
+});
+
+test('explains Bluetooth printing on the phone', async () => {
+  const { printer, section } = await openPrinterSettings({ status: 'disconnected', connectOnPrint: true });
+  expect(within(section).getByText('Nicht verbunden')).toBeInTheDocument();
+  expect(
+    within(section).getByText('Per Bluetooth. Nach dem Öffnen der App beim ersten Druck den Drucker einmal auswählen.'),
+  ).toBeInTheDocument();
+  printer.connect.mockRejectedValueOnce(new PrinterUserError('Dieses Druckermodell wird nicht unterstützt.'));
+  await userEvent.click(within(section).getByRole('button', { name: 'Drucker verbinden' }));
+  expect(await within(section).findByText('Dieses Druckermodell wird nicht unterstützt.')).toBeInTheDocument();
 });
