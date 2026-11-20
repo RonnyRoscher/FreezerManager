@@ -41,3 +41,19 @@ test('draws at a higher resolution for paper printing', () => {
   expect(canvas.width).toBe(960);
   expect(canvas.height).toBe(720);
 });
+
+test('prints the short code in a sans-serif font that Android has', () => {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d')!;
+  const fonts: Record<string, string> = {};
+  const fillText = ctx.fillText.bind(ctx);
+  ctx.fillText = (text: string, x: number, y: number) => {
+    fonts[text] = ctx.font;
+    fillText(text, x, y);
+  };
+  vi.spyOn(canvas, 'getContext').mockReturnValue(ctx);
+  drawLabel(canvas, makeItem({ short_code: 'K7F3' }), size);
+  expect(fonts.K7F3).toMatch(/bold/);
+  expect(fonts.K7F3).toMatch(/Arial/);
+  expect(fonts.K7F3).not.toMatch(/Courier/);
+});

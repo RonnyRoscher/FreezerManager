@@ -6,7 +6,6 @@ import { rgbaToBitmap } from './vendor/bitmap';
 import type { Bitmap } from './vendor/types';
 
 const SANS = 'Arial, Helvetica, sans-serif';
-const MONO = "'Courier New', monospace";
 const LINE_HEIGHT = 1.2;
 
 type TextLine = { text: string; font: string; size: number };
@@ -50,7 +49,8 @@ export function drawLabel(canvas: HTMLCanvasElement, item: ItemView, size: Label
     ...wrap(content.category, bodyFont, g.fontPx.body, 1),
     ...wrap(content.date, bodyFont, g.fontPx.body, 1),
     ...wrap(content.location, bodyFont, g.fontPx.body, 2),
-    ...wrap(content.code, `bold ${g.fontPx.body}px ${MONO}`, g.fontPx.body, 1),
+    // Sans-serif: Android has no Courier New and would fall back to a serif font.
+    ...wrap(content.code, `bold ${g.fontPx.body}px ${SANS}`, g.fontPx.body, 1),
   ];
 
   const blockHeight = lines.reduce((h, l) => h + l.size * LINE_HEIGHT, 0);
