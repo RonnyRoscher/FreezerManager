@@ -54,7 +54,7 @@ test('shows why printing failed', async () => {
 
 test('points to the settings when no printer is connected', async () => {
   const { repo, item } = await itemInRepo();
-  renderApp(`#/item/${item.id}`, repo, fakePrinter({ status: 'disconnected' }));
+  renderApp(`#/item/${item.id}`, repo, fakePrinter({ status: 'disconnected', connectOnPrint: false }));
   expect(await screen.findByRole('button', { name: 'Label drucken' })).toBeDisabled();
   expect(screen.getByRole('link', { name: 'Drucker in den Einstellungen verbinden' })).toHaveAttribute('href', '#/settings');
 });
@@ -64,7 +64,7 @@ test('explains printing needs Chrome or Edge on a PC', async () => {
   renderApp(`#/item/${item.id}`, repo, fakePrinter({ status: 'unsupported' }));
   expect(await screen.findByRole('button', { name: 'Label drucken' })).toBeDisabled();
   expect(
-    screen.getByText('Drucken geht nur in Chrome oder Edge am PC mit per USB angeschlossenem Drucker.'),
+    screen.getByText('Direktdruck geht in Chrome oder Edge am PC (USB) und in Chrome auf Android-Handys (Bluetooth).'),
   ).toBeInTheDocument();
 });
 

@@ -101,7 +101,7 @@ test('says when the label roll is not recognized', async () => {
 });
 
 test('offers to connect a printer', async () => {
-  const { printer, section } = await openPrinterSettings({ status: 'disconnected' });
+  const { printer, section } = await openPrinterSettings({ status: 'disconnected', connectOnPrint: false });
   expect(within(section).getByText('Nicht verbunden')).toBeInTheDocument();
   await userEvent.click(within(section).getByRole('button', { name: 'Drucker verbinden' }));
   expect(printer.connect).toHaveBeenCalled();
@@ -110,7 +110,7 @@ test('offers to connect a printer', async () => {
 test('explains that printing needs Chrome or Edge on a PC', async () => {
   const { section } = await openPrinterSettings({ status: 'unsupported' });
   expect(
-    within(section).getByText('Drucken geht nur in Chrome oder Edge am PC mit per USB angeschlossenem Drucker.'),
+    within(section).getByText('Direktdruck geht in Chrome oder Edge am PC (USB) und in Chrome auf Android-Handys (Bluetooth).'),
   ).toBeInTheDocument();
   expect(within(section).queryByRole('button', { name: 'Drucker verbinden' })).toBeNull();
 });

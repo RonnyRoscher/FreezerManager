@@ -1,4 +1,4 @@
-import { createPrinterService, type PrinterState } from './printerService';
+import { canPrint, createPrinterService, type PrinterState } from './printerService';
 import { createFakeHid } from '../test/fakeHid';
 import { makeItem } from '../test/fixtures';
 
@@ -6,7 +6,7 @@ const ready: PrinterState = { status: 'ready', model: 'T50M Pro', media: { lengt
 
 async function readyPrinter(options?: Parameters<typeof createFakeHid>[0]) {
   const fake = createFakeHid(options);
-  const printer = createPrinterService(fake.hid);
+  const printer = createPrinterService({ hid: fake.hid });
   await printer.init();
   return { fake, printer };
 }
@@ -21,8 +21,28 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-test('is unsupported without WebHID', () => {
-  expect(createPrinterService(undefined).getState()).toEqual({ status: 'unsupported' });
+test('is unsupported without WebHID and Web Bluetooth', () => {
+  expect(createPrinterService({}).getState()).toEqual({ status: 'unsupported' });
+});
+
+describe('canPrint', () => {
+  test.each<[PrinterState, boolean]>([
+    [{ status: 'ready', model: 'T50M Pro', media: null }, true],
+    [{ status: 'disconnected', connectOnPrint: true }, true],
+    [{ status: 'disconnected', connectOnPrint: false }, false],
+    [{ status: 'printing', model: 'T50M Pro', media: null }, false],
+    [{ status: 'error', message: 'x' }, false],
+    [{ status: 'unsupported' }, false],
+  ])('%j → %s', (state, expected) => {
+    expect(canPrint(state)).toBe(expected);
+  });
+});
+
+test('USB: ensureConnected reports whether a printer is ready', async () => {
+  const { printer } = await readyPrinter();
+  await expect(printer.ensureConnected()).resolves.toBe(true);
+  const { printer: none } = await readyPrinter({ granted: false });
+  await expect(none.ensureConnected()).resolves.toBe(false);
 });
 
 test('connects to a previously granted printer on start and closes it again', async () => {
@@ -33,7 +53,7 @@ test('connects to a previously granted printer on start and closes it again', as
 
 test('stays disconnected when the permission was withdrawn', async () => {
   const { printer } = await readyPrinter({ granted: false });
-  expect(printer.getState()).toEqual({ status: 'disconnected' });
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: false });
 });
 
 test('rejects Supvan printers of other families', async () => {
@@ -70,7 +90,7 @@ test('reports an open cover and stays ready', async () => {
 test('reports a printer that does not answer', async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   const fake = createFakeHid({ silent: true });
-  const printer = createPrinterService(fake.hid);
+  const printer = createPrinterService({ hid: fake.hid });
   const init = printer.init();
   await vi.advanceTimersByTimeAsync(6000);
   await init;
@@ -96,7 +116,7 @@ test('prints only once when asked twice at the same time', async () => {
 test('follows the printer being unplugged and plugged in again', async () => {
   const { fake, printer } = await readyPrinter();
   fake.unplug();
-  expect(printer.getState()).toEqual({ status: 'disconnected' });
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: false });
   fake.plug();
   await vi.waitFor(() => expect(printer.getState()).toEqual(ready));
 });
@@ -112,7 +132,7 @@ test('forgets the printer on disconnect', async () => {
   const { fake, printer } = await readyPrinter();
   await printer.disconnect();
   expect(fake.device.forget).toHaveBeenCalled();
-  expect(printer.getState()).toEqual({ status: 'disconnected' });
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: false });
 });
 
 test('reports a printer unplugged during a print and stays disconnected', async () => {
@@ -122,5 +142,5 @@ test('reports a printer unplugged during a print and stays disconnected', async 
   await vi.waitFor(() => expect(fake.commands()).toContain(0x13));
   fake.unplug();
   await assertion;
-  expect(printer.getState()).toEqual({ status: 'disconnected' });
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: false });
 });

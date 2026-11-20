@@ -17,6 +17,7 @@ export function fakePrinter(
     init: vi.fn(async () => {}),
     connect: vi.fn(async () => {}),
     disconnect: vi.fn(async () => {}),
+    ensureConnected: vi.fn(async () => true),
     print: vi.fn<Printer['print']>(async () => {}),
     setState(next: PrinterState) {
       state = next;
