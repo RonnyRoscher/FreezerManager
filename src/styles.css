@@ -269,6 +269,26 @@ body.demo::before {
   font-size: 3.4mm;
 }
 
+.label.narrow .label-name {
+  font-size: 2.9mm;
+}
+
+/* Name and location may wrap onto a second line instead of being cut off. */
+.label-text > .label-name,
+.label-text > .label-location {
+  white-space: normal;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.label-qr {
+  align-self: center;
+}
+
 .label-code {
   font-family: 'Courier New', monospace;
   font-weight: 700;

@@ -31,3 +31,14 @@ test('sizes the label in millimetres', () => {
   const { container } = render(<Label item={makeItem()} size={size} qrDataUrl="x" />);
   expect(container.firstChild).toHaveStyle({ width: '62mm', height: '29mm' });
 });
+
+test('leaves room for text on narrow labels such as 40 × 30 mm', () => {
+  render(<Label item={makeItem()} size={{ widthMm: 40, heightMm: 30 }} qrDataUrl="x" />);
+  const qr = screen.getByAltText('QR-Code');
+  expect(qr).toHaveStyle({ width: '18mm', height: '18mm' });
+});
+
+test('uses the full height for the QR code on wide labels', () => {
+  render(<Label item={makeItem()} size={{ widthMm: 62, heightMm: 29 }} qrDataUrl="x" />);
+  expect(screen.getByAltText('QR-Code')).toHaveStyle({ width: '27mm' });
+});

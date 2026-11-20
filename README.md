@@ -53,7 +53,10 @@ Gedruckt wird über den normalen Druckdialog des Browsers, ein Label pro Druck.
 - Im Druckertreiber (bzw. im Druckdialog) das Papierformat auf das Etikett stellen,
   Standard ist **62 × 29 mm** (z. B. Brother DK-11209).
 - Ränder: **Keine**, Skalierung: **100 %**, Kopf-/Fußzeilen aus.
-- Andere Etiketten (z. B. Dymo): Größe in der App unter **Einstellungen › Label** anpassen.
+- Andere Etiketten (z. B. Dymo, Katasymbol 40 × 30 mm): Größe in der App unter
+  **Einstellungen › Label** anpassen. Die Größe in der App und das Papierformat im
+  Druckdialog müssen übereinstimmen.
+- Im Druckdialog den Etikettendrucker als Ziel wählen, Papierformat = Etikettengröße.
 
 ### 4. Handy
 
