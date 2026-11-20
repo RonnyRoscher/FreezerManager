@@ -28,3 +28,23 @@ export function printerErrorMessage(e: unknown): string {
   }
   return `Drucken fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`;
 }
+
+export const BLUETOOTH_OFF = 'Bluetooth ist ausgeschaltet. Bitte am Handy einschalten.';
+export const BLUETOOTH_UNREACHABLE = 'Drucker per Bluetooth nicht erreichbar. Ist er eingeschaltet und in der Nähe?';
+export const BLUETOOTH_NO_RESPONSE = 'Drucker antwortet nicht. Ist er eingeschaltet und in der Nähe?';
+
+const domErrorName = (e: unknown) => (e instanceof DOMException || e instanceof Error ? e.name : '');
+
+/** The user closed the browser's printer chooser without picking one. */
+export function isChooserCancelled(e: unknown): boolean {
+  return domErrorName(e) === 'NotFoundError' && /cancel/i.test((e as Error).message);
+}
+
+export function bluetoothErrorMessage(e: unknown): string {
+  const name = domErrorName(e);
+  if (name === 'NotSupportedError') return BLUETOOTH_OFF;
+  if (name === 'NotFoundError' && /adapter|not available/i.test((e as Error).message)) return BLUETOOTH_OFF;
+  if (name === 'NetworkError') return BLUETOOTH_UNREACHABLE;
+  if (e instanceof PrinterError && e.code === 'timeout') return BLUETOOTH_NO_RESPONSE;
+  return printerErrorMessage(e);
+}
