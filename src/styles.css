@@ -234,65 +234,14 @@ body.demo::before {
   text-align: center;
 }
 
-/* Label */
-.label {
-  display: flex;
-  gap: 1.5mm;
-  padding: 1mm;
-  overflow: hidden;
-  background: #fff;
-  color: #000;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 2.4mm;
-  line-height: 1.2;
+/* Paper printing (emergency fallback) */
+.paper-label {
+  display: inline-block;
+  border: 0.2mm dashed #000;
 }
 
-.label-qr {
-  flex: none;
-}
-
-.label-text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.label-text > div {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.label-name {
-  font-weight: 700;
-  font-size: 3.4mm;
-}
-
-.label.narrow .label-name {
-  font-size: 2.9mm;
-}
-
-/* Name and location may wrap onto a second line instead of being cut off. */
-.label-text > .label-name,
-.label-text > .label-location {
-  white-space: normal;
-  overflow-wrap: break-word;
-  hyphens: auto;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-}
-
-.label-qr {
-  align-self: center;
-}
-
-.label-code {
-  font-family: 'Courier New', monospace;
-  font-weight: 700;
-  letter-spacing: 0.3mm;
+.paper-label img {
+  display: block;
 }
 
 #print-root {

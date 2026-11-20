@@ -4,6 +4,12 @@ import { renderApp, seededRepository } from '../test/renderApp';
 import { drawer2, meat } from '../test/fixtures';
 import { fakePrinter } from '../test/fakePrinter';
 import { PrinterUserError } from '../printer/printerMessages';
+import { printOnPaper } from '../print/printOnPaper';
+
+vi.mock('../print/printOnPaper', () => ({
+  PAPER_FALLBACK_SIZE: { lengthMm: 40, widthMm: 30 },
+  printOnPaper: vi.fn(async () => undefined),
+}));
 
 async function itemInRepo() {
   const repo = seededRepository();
@@ -60,4 +66,20 @@ test('explains printing needs Chrome or Edge on a PC', async () => {
   expect(
     screen.getByText('Drucken geht nur in Chrome oder Edge am PC mit per USB angeschlossenem Drucker.'),
   ).toBeInTheDocument();
+});
+
+test('prints on paper even without a label printer', async () => {
+  const { repo, item } = await itemInRepo();
+  renderApp(`#/item/${item.id}`, repo, fakePrinter({ status: 'unsupported' }));
+  const button = await screen.findByRole('button', { name: 'Auf Papier drucken' });
+  expect(button).toBeEnabled();
+  await userEvent.click(button);
+  expect(printOnPaper).toHaveBeenCalledWith(expect.objectContaining({ id: item.id }), { lengthMm: 40, widthMm: 30 });
+});
+
+test('prints on paper in the size of the connected roll', async () => {
+  const { repo, item } = await itemInRepo();
+  renderApp(`#/item/${item.id}`, repo, fakePrinter({ status: 'ready', model: 'T50M Pro', media: { lengthMm: 50, widthMm: 30 } }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Auf Papier drucken' }));
+  expect(printOnPaper).toHaveBeenLastCalledWith(expect.objectContaining({ id: item.id }), { lengthMm: 50, widthMm: 30 });
 });

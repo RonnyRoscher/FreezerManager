@@ -10,6 +10,7 @@ import { LOAD_FAILED, NOT_IN_STOCK } from '../lib/messages';
 import { PrinterHint } from '../components/PrinterHint';
 import { printerErrorMessage } from '../printer/printerMessages';
 import { usePrinter } from '../printer/PrinterContext';
+import { PAPER_FALLBACK_SIZE, printOnPaper } from '../print/printOnPaper';
 
 export function ItemDetailPage() {
   const repo = useRepository();
@@ -92,6 +93,16 @@ export function ItemDetailPage() {
           }}
         >
           {printing ? 'Druckt …' : 'Label drucken'}
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => {
+            const media = printer.state.status === 'ready' || printer.state.status === 'printing' ? printer.state.media : null;
+            void printOnPaper(item, media ?? PAPER_FALLBACK_SIZE);
+          }}
+        >
+          Auf Papier drucken
         </button>
       </div>
       <PrinterHint state={printer.state} />
