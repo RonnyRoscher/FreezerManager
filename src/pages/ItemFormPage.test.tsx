@@ -141,3 +141,49 @@ test('saves without a printer but cannot print', async () => {
   await screen.findByText(/Gespeichert: Hackfleisch/);
   expect(await repo.listItems()).toHaveLength(1);
 });
+
+describe('printing over Bluetooth from the form', () => {
+  const bluetooth = () => fakePrinter({ status: 'disconnected', connectOnPrint: true });
+
+  test('connects before saving, then prints', async () => {
+    const printer = bluetooth();
+    const base = seededRepository();
+    const repo = { ...base, createItem: vi.fn(base.createItem) };
+    await openForm(repo, printer);
+    await fillRequired('Gulasch');
+    const button = screen.getByRole('button', { name: 'Speichern & Label drucken' });
+    expect(button).toBeEnabled();
+    await userEvent.click(button);
+    await screen.findByText(/Gespeichert: Gulasch/);
+    expect(printer.ensureConnected.mock.invocationCallOrder[0]).toBeLessThan(repo.createItem.mock.invocationCallOrder[0]);
+    expect(printer.print).toHaveBeenCalledWith(expect.objectContaining({ name: 'Gulasch' }));
+  });
+
+  test('saves without printing when no printer was chosen', async () => {
+    const printer = bluetooth();
+    printer.ensureConnected.mockResolvedValueOnce(false);
+    const repo = await openForm(seededRepository(), printer);
+    await fillRequired('Gulasch');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern & Label drucken' }));
+    expect(await screen.findByText('Gespeichert, aber nicht gedruckt: kein Drucker ausgewählt.')).toBeInTheDocument();
+    expect(printer.print).not.toHaveBeenCalled();
+    expect(await repo.listItems()).toHaveLength(1);
+  });
+
+  test('saves and explains when the printer cannot be reached', async () => {
+    const printer = bluetooth();
+    printer.ensureConnected.mockRejectedValueOnce(
+      new PrinterUserError('Drucker per Bluetooth nicht erreichbar. Ist er eingeschaltet und in der Nähe?'),
+    );
+    const repo = await openForm(seededRepository(), printer);
+    await fillRequired('Gulasch');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern & Label drucken' }));
+    expect(
+      await screen.findByText(
+        'Gespeichert, aber Drucken fehlgeschlagen: Drucker per Bluetooth nicht erreichbar. Ist er eingeschaltet und in der Nähe?',
+      ),
+    ).toBeInTheDocument();
+    expect(printer.print).not.toHaveBeenCalled();
+    expect(await repo.listItems()).toHaveLength(1);
+  });
+});

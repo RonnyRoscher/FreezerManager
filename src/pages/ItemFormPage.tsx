@@ -8,6 +8,7 @@ import { PrinterHint } from '../components/PrinterHint';
 import { LOAD_FAILED, NOT_IN_STOCK, SAVE_FAILED } from '../lib/messages';
 import { printerErrorMessage } from '../printer/printerMessages';
 import { usePrinter } from '../printer/PrinterContext';
+import { canPrint } from '../printer/printerService';
 
 type Fields = {
   name: string;
@@ -20,6 +21,11 @@ type Fields = {
 };
 
 const emptyItemFields = { name: '', details: '', quantity: '' };
+
+const NOT_PRINTED = 'Gespeichert, aber nicht gedruckt: kein Drucker ausgewählt.';
+
+/** The reason a print failed, without a leading "Drucken fehlgeschlagen:". */
+const printFailure = (e: unknown) => printerErrorMessage(e).replace(/^Drucken fehlgeschlagen: /, '');
 
 function validate(f: Fields): string | null {
   if (!f.name.trim()) return 'Bitte Namen angeben';
@@ -131,6 +137,17 @@ export function ItemFormPage() {
     }
     setError('');
     setBusy(true);
+    // Connect before saving: picking a Bluetooth printer needs a fresh tap, and a slow save
+    // would let that expire. Saving happens either way.
+    let connected = false;
+    let connectError = '';
+    if (print) {
+      try {
+        connected = await printer.ensureConnected();
+      } catch (e) {
+        connectError = printFailure(e);
+      }
+    }
     let saved;
     try {
       saved = id ? await repo.updateItem(id, toInput(current)) : await repo.createItem(toInput(current));
@@ -150,13 +167,18 @@ export function ItemFormPage() {
       if (!names.includes(saved.name)) setNames([...names, saved.name].sort((a, b) => a.localeCompare(b, 'de')));
     }
     // The item is stored at this point; a print problem must not look like a failed save.
+    if (print && (connectError || !connected)) {
+      setError(connectError ? `Gespeichert, aber Drucken fehlgeschlagen: ${connectError}` : NOT_PRINTED);
+      setBusy(false);
+      return;
+    }
     if (print) {
       setPrinting(true);
       try {
         const view = await repo.getItem(saved.id);
         if (view) await printer.print(view);
       } catch (e) {
-        setError(`Gespeichert, aber Drucken fehlgeschlagen: ${printerErrorMessage(e).replace(/^Drucken fehlgeschlagen: /, '')}`);
+        setError(`Gespeichert, aber Drucken fehlgeschlagen: ${printFailure(e)}`);
         setBusy(false);
         setPrinting(false);
         return;
@@ -261,7 +283,7 @@ export function ItemFormPage() {
           <button
             type="button"
             className="secondary"
-            disabled={busy || printer.state.status !== 'ready'}
+            disabled={busy || !canPrint(printer.state)}
             onClick={() => save(true)}
           >
             {printing ? 'Druckt …' : 'Speichern & Label drucken'}

@@ -25,6 +25,7 @@ export function usePrinter() {
     state,
     connect: () => printer.connect(),
     disconnect: () => printer.disconnect(),
+    ensureConnected: () => printer.ensureConnected(),
     print: (item: ItemView) => printer.print(item),
   };
 }
