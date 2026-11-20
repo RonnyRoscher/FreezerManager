@@ -1,6 +1,7 @@
 import type { ItemView } from '../domain/types';
 import { PrinterUserError } from './printerMessages';
 import type { MediaSize } from './printJob';
+import { createBluetoothPrinter } from './bluetoothPrinter';
 import { createUsbPrinter } from './usbPrinter';
 
 export type { MediaSize } from './printJob';
@@ -64,5 +65,6 @@ export function createPrinterService(
     : {},
 ): Printer {
   if (apis.hid) return createUsbPrinter(apis.hid);
+  if (apis.bluetooth) return createBluetoothPrinter();
   return unsupportedPrinter();
 }
