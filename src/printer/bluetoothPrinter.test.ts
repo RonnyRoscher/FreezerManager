@@ -139,3 +139,32 @@ test('forgets the printer on disconnect', async () => {
   await printer.print(makeItem());
   expect(fake.requestDevice).toHaveBeenCalledTimes(2);
 });
+
+test('reconnects when the link is gone without a disconnect event', async () => {
+  const printer = setup();
+  await printer.connect();
+  fake.device.gatt.connected = false; // e.g. page frozen in the background, event never delivered
+  await printer.print(makeItem());
+  expect(fake.connect).toHaveBeenCalledTimes(2);
+  expect(fake.requestDevice).toHaveBeenCalledTimes(1);
+  expect(printer.getState()).toEqual(ready);
+});
+
+test('lets the user pick another printer from the settings while the remembered one is unreachable', async () => {
+  const printer = setup();
+  await printer.connect();
+  fake.dropConnection();
+  await printer.connect();
+  expect(fake.requestDevice).toHaveBeenCalledTimes(2);
+  expect(printer.getState()).toEqual(ready);
+});
+
+test('a late disconnect event of an old link does not drop the current connection', async () => {
+  const printer = setup();
+  await printer.connect();
+  await printer.connect(); // same printer picked again; Chrome may deliver the old link's event later
+  fake.fireDisconnectEvent();
+  expect(printer.getState()).toEqual(ready);
+  await printer.print(makeItem());
+  expect(fake.connect).toHaveBeenCalledTimes(2);
+});

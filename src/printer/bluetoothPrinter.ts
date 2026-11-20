@@ -25,6 +25,7 @@ export function createBluetoothPrinter(): Printer {
   let driver: T5080BtDriver | null = null;
   let printing = false;
   let linkLost = false;
+  const listening = new WeakSet<BluetoothDevice>();
 
   function setState(next: PrinterState) {
     state = next;
@@ -65,20 +66,21 @@ export function createBluetoothPrinter(): Printer {
     }
   }
 
-  async function ensureConnected(): Promise<boolean> {
-    if (driver) return true;
-    let d = device;
-    if (!d) {
-      d = await choose();
-      if (!d) return false;
-      const name = bluetoothModelName(d.name);
-      if (!name) throw new PrinterUserError(UNSUPPORTED_MODEL);
-      device = d;
-      model = name;
-      d.addEventListener('gattserverdisconnected', () => {
-        if (device === d) onLinkLost();
-      });
-    }
+  /** Remembers a newly chosen printer; rejects printers of other families. */
+  function remember(d: BluetoothDevice) {
+    const name = bluetoothModelName(d.name);
+    if (!name) throw new PrinterUserError(UNSUPPORTED_MODEL);
+    device = d;
+    model = name;
+    if (listening.has(d)) return;
+    listening.add(d);
+    d.addEventListener('gattserverdisconnected', () => {
+      // Chrome delivers the event as a later task; ignore it when a newer link is already up.
+      if (device === d && !d.gatt?.connected) onLinkLost();
+    });
+  }
+
+  async function connectTo(d: BluetoothDevice) {
     setState({ status: 'connecting' });
     try {
       await open(d);
@@ -86,6 +88,18 @@ export function createBluetoothPrinter(): Printer {
       setState(DISCONNECTED);
       throw new PrinterUserError(userMessage(e));
     }
+  }
+
+  async function ensureConnected(): Promise<boolean> {
+    // The link can be gone without an event, e.g. after Android froze the page in the background.
+    if (driver && device?.gatt?.connected) return true;
+    if (driver) onLinkLost();
+    if (!device) {
+      const d = await choose();
+      if (!d) return false;
+      remember(d);
+    }
+    await connectTo(device!);
     return true;
   }
 
@@ -96,8 +110,18 @@ export function createBluetoothPrinter(): Printer {
       return () => listeners.delete(listener);
     },
     async init() {},
+    /** The explicit button always shows the chooser, so another printer can be picked. */
     async connect() {
-      await ensureConnected();
+      const d = await choose();
+      if (!d) return;
+      const previous = transport;
+      driver?.channel.dispose();
+      driver = null;
+      transport = null;
+      device = null;
+      await previous?.close().catch(() => {});
+      remember(d);
+      await connectTo(d);
     },
     async disconnect() {
       const d = device;

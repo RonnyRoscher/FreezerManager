@@ -76,7 +76,8 @@ installierte App). Einrichten muss man nichts:
   ohne erneute Auswahl.
 - Der Drucker spricht immer nur mit einem Gerät: Katasymbol-App schließen und nicht
   gleichzeitig per USB am PC verbinden.
-- Einen anderen Drucker wählen: **Einstellungen › Drucker › Trennen**, dann neu drucken.
+- Einen anderen Drucker wählen: **Einstellungen › Drucker › „Drucker verbinden“** – die Auswahl
+  erscheint dort immer, auch wenn schon ein Drucker gemerkt ist.
 - **iPhone:** Safari unterstützt kein Bluetooth für Webseiten – dort nur „Auf Papier drucken“.
 
 #### Notlösung: auf Papier drucken

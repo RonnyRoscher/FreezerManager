@@ -115,6 +115,8 @@ export function installFakeBluetooth(initial: FakeBluetoothOptions = {}) {
     commands: () => writes.filter((w) => w[0] === 0x7e && w[1] === 0x5a && w[2] === 0x0c).map((w) => w[7]),
     /** The link drops (printer off, app in the background). */
     dropConnection: () => device.gatt.disconnect(),
+    /** Delivers a gattserverdisconnected event without changing the link (a late event). */
+    fireDisconnectEvent: () => deviceListeners.forEach((fn) => fn()),
     uninstall: () => {
       delete (navigator as unknown as Record<string, unknown>).bluetooth;
     },
