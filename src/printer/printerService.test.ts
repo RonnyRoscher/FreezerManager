@@ -114,3 +114,13 @@ test('forgets the printer on disconnect', async () => {
   expect(fake.device.forget).toHaveBeenCalled();
   expect(printer.getState()).toEqual({ status: 'disconnected' });
 });
+
+test('reports a printer unplugged during a print and stays disconnected', async () => {
+  const { fake, printer } = await readyPrinter();
+  const print = printer.print(makeItem());
+  const assertion = expect(print).rejects.toThrow('Drucker wurde getrennt.');
+  await vi.waitFor(() => expect(fake.commands()).toContain(0x13));
+  fake.unplug();
+  await assertion;
+  expect(printer.getState()).toEqual({ status: 'disconnected' });
+});

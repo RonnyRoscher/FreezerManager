@@ -54,7 +54,9 @@ dafür nicht gebraucht.
 
 - Nur in **Chrome oder Edge am PC**, Drucker per **USB-Kabel** angeschlossen.
 - Einmalig unter **Einstellungen › Drucker** auf „Drucker verbinden“ klicken und den Drucker
-  auswählen. Danach verbindet sich die App bei jedem Start von selbst.
+  auswählen. Danach verbindet sich die App beim Start normalerweise von selbst. Chrome merkt
+  sich die Freigabe aber nicht bei jedem Gerät dauerhaft: Steht dort nach einem Neustart oder
+  erneutem Einstecken „Nicht verbunden“, einfach noch einmal „Drucker verbinden“ klicken.
 - Die Etikettengröße liest die App aus der eingelegten Rolle.
 - Ist das Etikett zu blass oder zu dunkel: **Druckdichte** (1–9, Standard 4) anpassen.
 - Die Katasymbol-App beim Drucken schließen, sonst ist der Drucker belegt.
