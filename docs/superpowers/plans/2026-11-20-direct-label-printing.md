@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Etiketten werden ohne Druckdialog per USB (WebHID) direkt an einen Katasymbol/Supvan-T50/T80-Drucker geschickt; der Browser-Druck entfällt.
+**Goal:** Etiketten werden ohne Druckdialog per USB (WebHID) direkt an einen Katasymbol/Supvan-T50/T80-Drucker geschickt; als Notlösung lässt sich ein einzelnes Etikett auf A4 zum Ausschneiden drucken.
 
 **Architecture:** Der im Spike erprobte Druckercode (MIT, vendored) wandert nach `src/printer/vendor/`. Darüber liegen reine Layout-Funktionen, ein Canvas-Renderer, der ein `ItemView` in eine 1-Bit-Bitmap mit 8 Punkten/mm verwandelt, und ein `PrinterService`, der Verbindung und Druckaufträge verwaltet und das USB-Gerät nur pro Gespräch öffnet. React-Seiten greifen über `PrinterProvider`/`usePrinter()` darauf zu.
 
@@ -12,7 +12,8 @@
 
 ## Global Constraints
 
-- Nur Direktdruck: kein `window.print()`, keine Labelgröße-Einstellung mehr.
+- Direktdruck ist Standard; `window.print()` nur noch für „Auf Papier drucken“ (Detailseite). Keine Labelgröße-Einstellung mehr.
+- Papierdruck: `@page { size: A4; margin: 10mm }`, Etikett oben links in Originalgröße (Rolle des verbundenen Druckers, sonst 40 × 30 mm), gestrichelte Schnittlinie `0.2mm dashed #000` um das Etikett, Bild in 24 Punkte/mm.
 - Oberfläche Deutsch, Code-Bezeichner Englisch.
 - Vendored Code (`src/printer/vendor/`) bleibt inhaltlich unverändert gegenüber `src/spike/printer/` (Commit `fd7b53e` von khromov/supvan-katasymbol-printer-web-ui); einzige Ergänzung: `devices.ts` (nur Familie `t5080`). `lzma.js` nie durch Standard-LZMA ersetzen. Lizenzdatei und `SOURCE.txt` bleiben.
 - Druckerauflösung 8 Punkte/mm; Etikett-Canvas `lengthMm × 8` breit, `widthMm × 8` hoch (40 × 30 mm → 320 × 240).
@@ -113,7 +114,7 @@ src/test/fakePrinter.ts        Printer-Stub für Seitentests
 
 **Interfaces:**
 - Consumes: Task 2 (`labelLines`, `wrapText`, `labelGeometry`, `LabelSizeMm`); `buildTakeUrl`, `appBaseUrl` (`src/domain/qrUrl.ts`); `rgbaToBitmap`, `Bitmap` (vendor).
-- Produces: `drawLabel(canvas: HTMLCanvasElement, item: ItemView, size: LabelSizeMm): void` und `labelBitmap(item: ItemView, size: LabelSizeMm): Bitmap`.
+- Produces: `drawLabel(canvas: HTMLCanvasElement, item: ItemView, size: LabelSizeMm, scale = 1): void` (Canvas wird auf `width × scale`, `height × scale` gesetzt, Zeichnung per `ctx.scale(scale, scale)` in denselben Punkt-Koordinaten) und `labelBitmap(item: ItemView, size: LabelSizeMm): Bitmap` (`scale` 1, danach `rgbaToBitmap`).
 
 Zeichenregeln: weißer Hintergrund; QR über `QRCode.create(url, { errorCorrectionLevel: 'M' })`, jedes Modul als schwarzes Rechteck mit ganzzahliger Modulgröße `floor(qr.size / modules)`, im QR-Feld zentriert; Text links bündig ab `text.x`, Schrift `Arial, Helvetica, sans-serif`: Name fett `fontPx.name` (max. 2 Zeilen), `extra`, Kategorie, Datum je `fontPx.body` (1 Zeile, mit `wrapText(…, 1)`), Ort `fontPx.body` (max. 2 Zeilen), Kurzcode fett `fontPx.body` in `'Courier New', monospace`; Zeilenhöhe 1,2 × Schriftgröße; Textblock vertikal zentriert.
 
@@ -122,6 +123,7 @@ Zeichenregeln: weißer Hintergrund; QR über `QRCode.create(url, { errorCorrecti
   - Ecke `(0,0)` und rechter Rand (`x = 319`) weiß (`data[i] === 0`).
   - QR-Feld `x 8..151, y 48..191` enthält schwarze Punkte; Textfeld `x 164..311` enthält schwarze Punkte.
   - Zwei Etiketten für Items mit verschiedener `id` unterscheiden sich im QR-Feld.
+  - `drawLabel(canvas, item, size40x30, 3)` → `canvas.width` 960, `canvas.height` 720.
 - [ ] **Step 2:** `npm i -D canvas`; `npx vitest run src/printer/labelBitmap` → FAIL.
 - [ ] **Step 3:** Implementieren.
 - [ ] **Step 4:** Tests → PASS. Manuell: Bitmap einmal als PNG ausgeben (Wegwerf-Skript im Scratchpad) und mit dem Testdruck-Foto vergleichen – gut lesbar bei 40 × 30.
@@ -230,14 +232,31 @@ Verhalten: „Label drucken“ und „Speichern & Label drucken“ aktiv nur bei
 - [ ] **Step 2:** Tests → FAIL. **Step 3:** Implementieren. **Step 4:** `npx vitest run` → PASS.
 - [ ] **Step 5: Commit** `feat: print labels directly from detail page and form`
 
-### Task 8: Browser-Druck entfernen, README
+### Task 8: Notlösung „Auf Papier drucken“
 
 **Files:**
-- Delete: `src/print/` (alle Dateien), `src/components/Label.tsx`, `src/components/Label.test.tsx`
-- Modify: `src/styles.css` (Abschnitte `/* Label */` und `@media print` entfernen, Demo-Banner-Regel für Druck entfällt mit), `README.md`
+- Create: `src/print/printOnPaper.ts`, `src/print/printOnPaper.test.ts`
+- Delete: `src/print/printLabel.tsx`, `src/print/printLabel.test.tsx`, `src/print/labelSettings.ts`, `src/print/labelSettings.test.ts`, `src/components/Label.tsx`, `src/components/Label.test.tsx`
+- Modify: `src/pages/ItemDetailPage.tsx` (+ Test), `src/styles.css` (Abschnitt `/* Label */` entfernen; `@media print`-Regeln für `#print-root` behalten, Schnittlinie ergänzen)
 
-- [ ] **Step 1:** `grep -rn "print/\|Label'" src` → nur noch erwartete Treffer; Dateien löschen.
-- [ ] **Step 2:** README, Abschnitt „3. Etikettendrucker“ ersetzen: Katasymbol/Supvan T50/T80 per USB; nur Chrome/Edge am PC; einmal unter Einstellungen › Drucker verbinden, danach automatisch; Katasymbol-App beim Drucken schließen; Etikettengröße kommt aus der Rolle; Druckdichte 1–9; am Handy kein Druck. Checkliste „Manuelle Prüfung“: Druck 40 × 30, Kabel ziehen/stecken, Neuladen verbindet automatisch.
+**Interfaces:**
+- Consumes: `drawLabel` (Task 3), `usePrinter` (Task 6).
+- Produces: `PAPER_FALLBACK_SIZE: LabelSizeMm = { lengthMm: 40, widthMm: 30 }`; `paperPageCss(): string` → `'@page { size: A4; margin: 10mm }'`; `printOnPaper(item: ItemView, size: LabelSizeMm): Promise<void>` – zeichnet mit `drawLabel(…, 3)`, setzt das Bild (`canvas.toDataURL('image/png')`, `alt="Etikett"`, `width: <lengthMm>mm`, `height: <widthMm>mm`) mit Schnittlinie in einen Container `#print-root` samt `<style>` mit `paperPageCss()`, wartet auf `img.decode()` (falls vorhanden) und ruft `window.print()`. Der Container bleibt bis zum nächsten Aufruf bestehen (kein Aufräumen bei `afterprint`), der vorige wird beim nächsten Aufruf ersetzt.
+
+- [ ] **Step 1: Failing tests**
+  - `printOnPaper(item, { lengthMm: 40, widthMm: 30 })` → genau ein `#print-root`, darin `img[alt="Etikett"]` mit Stil `width: 40mm; height: 30mm`, `<style>` enthält `'@page { size: A4; margin: 10mm }'`, `window.print` einmal aufgerufen.
+  - nach `afterprint` ist `#print-root` noch da; zweiter Aufruf → weiterhin genau ein `#print-root`.
+  - Detailseite: Button „Auf Papier drucken“ aktiv auch bei Zustand `unsupported` und `disconnected`; Klick ruft `printOnPaper` (Modul-Mock) mit dem `ItemView` und `{ lengthMm: 40, widthMm: 30 }` bei `disconnected` bzw. der Rollen-Größe bei `ready` mit `media { lengthMm: 50, widthMm: 30 }`.
+- [ ] **Step 2:** Tests → FAIL. **Step 3:** Implementieren; alte Dateien löschen. **Step 4:** `npx vitest run` → PASS.
+- [ ] **Step 5: Commit** `feat: print a single label on plain paper as fallback`
+
+### Task 9: Aufräumen, README
+
+**Files:**
+- Modify: `src/styles.css`, `README.md`
+
+- [ ] **Step 1:** `grep -rn "labelSettings\|printLabel\|components/Label" src` → keine Treffer; ungenutztes CSS entfernen.
+- [ ] **Step 2:** README, Abschnitt „3. Etikettendrucker“ ersetzen: Katasymbol/Supvan T50/T80 per USB; nur Chrome/Edge am PC; einmal unter Einstellungen › Drucker verbinden, danach automatisch; Katasymbol-App beim Drucken schließen; Etikettengröße kommt aus der Rolle; Druckdichte 1–9. Neuer Unterabschnitt „Notlösung: auf Papier drucken“ (Detailseite › „Auf Papier drucken“, A4, Ränder „Standard“, Skalierung 100 %, ausschneiden; geht auch am Handy). Checkliste „Manuelle Prüfung“: Druck 40 × 30, Kabel ziehen/stecken, Neuladen verbindet automatisch.
 - [ ] **Step 3:** `npx vitest run` → PASS; `npx tsc --noEmit` → keine Fehler; `npm run build` → erfolgreich.
-- [ ] **Step 4:** Manuell im Browser (Demo-Modus, simuliertes HID wie im Spike-Check): Einstellungen zeigen „Verbunden …“, Druck aus Detailseite läuft durch, gesendete Daten entpacken zu einem lesbaren Etikett.
-- [ ] **Step 5: Commit** `chore: remove browser printing, document direct printing`
+- [ ] **Step 4:** Manuell im Browser (Demo-Modus, simuliertes HID wie im Spike-Check): Einstellungen zeigen „Verbunden …“, Druck aus Detailseite läuft durch, gesendete Daten entpacken zu einem lesbaren Etikett; „Auf Papier drucken“ als PDF (A4) zeigt das Etikett 40 × 30 mm oben links mit Schnittlinie.
+- [ ] **Step 5: Commit** `chore: clean up and document direct and paper printing`

@@ -27,6 +27,8 @@ ausgerichtet heraus. Der Drucker meldete dabei:
 - Die Etikettengröße kommt aus dem Drucker (eingelegte Rolle), nicht aus einer Einstellung.
 - Etiketten bleiben inhaltlich wie bisher: QR-Code, Name, Menge · Details, Kategorie,
   Einfrierdatum, Ort, Kurzcode.
+- Notlösung ohne Etikettendrucker: ein einzelnes Etikett auf einem normalen (A4-)Drucker
+  ausdrucken, zum Ausschneiden (Nachtrag 2026-11-20, vom Nutzer gewünscht).
 
 ## Nicht-Ziele
 
@@ -41,9 +43,10 @@ ausgerichtet heraus. Der Drucker meldete dabei:
 
 ## Rahmenbedingungen
 
-- **Nur Direktdruck.** Der bisherige Weg über `window.print()` (`src/print/printLabel.tsx`,
-  `src/components/Label.tsx`, Labelgröße in den Einstellungen, `fm.labelSize`, Druck-CSS)
-  wird entfernt. Ohne verbundenen Drucker kann nicht gedruckt werden (vom Nutzer so gewählt).
+- **Direktdruck ist der Standard.** Der bisherige Browser-Druck in seiner jetzigen Form
+  (`src/print/printLabel.tsx` mit HTML-Etikett `src/components/Label.tsx`, Labelgröße in den
+  Einstellungen, `fm.labelSize`) wird entfernt. Als Notlösung bleibt nur „Auf Papier drucken“
+  (siehe unten) über den normalen Druckdialog.
 - WebHID gibt es nur in Chromium-Browsern am Desktop (Chrome, Edge). Am Handy und in
   Firefox/Safari gibt es keinen Druck; die Druck-Buttons sind dort deaktiviert mit Hinweis.
 - Druckerprotokoll: übernommen aus
@@ -56,8 +59,12 @@ ausgerichtet heraus. Der Drucker meldete dabei:
 
 1. **Direktdruck als Standard, Browser-Druck als Ausweichweg** – druckt auch ohne Drucker
    (PDF, andere Drucker), dafür zwei Druckwege zu pflegen.
-2. **Nur Direktdruck** – *gewählt.* Ein Druckweg, weniger Code; ohne verbundenen Drucker
-   (Handy, anderer Browser) kein Druck.
+2. **Nur Direktdruck** – zunächst gewählt. Ein Druckweg, weniger Code; ohne verbundenen
+   Drucker (Handy, anderer Browser) kein Druck.
+3. **Direktdruck + „Auf Papier drucken“ als Notlösung** – *gewählt (Nachtrag).* Wie 2, dazu
+   ein ausdrücklicher zweiter Button für ein einzelnes Etikett auf A4 zum Ausschneiden. Kein
+   automatischer Rückfall, keine Etikettenbögen (mehrere Etiketten pro Blatt wären deutlich
+   mehr Aufwand und werden nicht gebraucht).
 
 Für das Zeichnen des Etiketts: direkt auf ein Canvas in Druckerauflösung (8 Punkte/mm,
 schwarz/weiß) statt HTML in ein Bild umzuwandeln – scharfe Kanten, keine Abhängigkeit von
@@ -125,6 +132,21 @@ Browser-Layout. (Meine Entscheidung.)
   - „Speichern & Label drucken“ speichert immer; Druckfehler zeigen wie bisher „Gespeichert,
     aber Drucken fehlgeschlagen.“ plus Grund.
 
+### Notlösung „Auf Papier drucken“
+
+- Button „Auf Papier drucken“ nur auf der Detailseite, neben „Label drucken“; immer aktiv,
+  auch ohne Etikettendrucker und am Handy. Im Formular kein Papier-Button (Speichern, dann
+  Detailseite). *(Meine Entscheidung.)*
+- Öffnet den normalen Druckdialog (`window.print()`) mit einer Druckansicht: `@page` A4,
+  10 mm Rand; das Etikett oben links in Originalgröße, umgeben von einer dünnen
+  gestrichelten Schnittlinie.
+- Größe: die Rolle des verbundenen Etikettendruckers, sonst 40 × 30 mm. Keine Einstellung.
+- Das Etikett wird mit demselben Zeichner erzeugt wie für den Etikettendrucker, aber in
+  dreifacher Auflösung (24 Punkte/mm, Graustufen, ohne Schwellwert) und als Bild in
+  Millimetergröße eingesetzt. *(Meine Entscheidung: ein Etikett-Layout statt zwei.)*
+- Die Druckansicht bleibt bis zum nächsten Papierdruck unsichtbar im Dokument (Chrome löst
+  `afterprint` aus, bevor die Vorschau fertig ist – Ursache des früheren leeren Etiketts).
+
 ### Fehlerbehandlung
 
 Meldungen auf Deutsch, aus den Treiberfehlern abgeleitet:
@@ -157,10 +179,12 @@ Meldungen auf Deutsch, aus den Treiberfehlern abgeleitet:
 ### Aufräumen
 
 - Entfernen: `druck-test.html`, `src/spike/`, Build-Eintrag `drucktest`, Workbox-Ausnahme,
-  `src/print/` (Browser-Druck, Labelgröße), `src/components/Label.tsx` samt Tests, Druck-CSS
-  in `styles.css`.
+  `src/print/labelSettings.ts` und `src/print/printLabel.tsx` (ersetzt durch den Papierdruck),
+  `src/components/Label.tsx` samt Tests, Label-CSS in `styles.css` (Druck-CSS für den
+  Papierdruck bleibt bzw. wird angepasst).
 - README: Abschnitt „Etikettendrucker“ neu (USB, Chrome/Edge, einmal verbinden, Katasymbol-App
-  schließen, Dichte), Hinweis, dass am Handy nicht gedruckt wird.
+  schließen, Dichte), Hinweis, dass am Handy nur „Auf Papier drucken“ geht; Notlösung
+  A4 beschreiben (Ränder „Standard“, Skalierung 100 %).
 
 ## Dem Umsetzenden überlassen
 
