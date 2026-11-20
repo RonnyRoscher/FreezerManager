@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { handleAuthRedirect, parseAuthRedirect } from './auth/authRedirect';
+import { createPrinterService } from './printer/printerService';
 import type { Repository } from './data/repository';
 import './styles.css';
 
@@ -25,7 +26,7 @@ createRepository().then(async (repo) => {
   const authMessage = await handleAuthRedirect(repo, authRedirect);
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <App repo={repo} authMessage={authMessage} />
+      <App repo={repo} printer={createPrinterService()} authMessage={authMessage} />
     </React.StrictMode>,
   );
 });

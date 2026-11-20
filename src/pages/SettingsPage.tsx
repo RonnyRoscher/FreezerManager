@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from
 import { useRepository } from '../data/RepositoryContext';
 import type { Category, FreezerWithCompartments } from '../domain/types';
 import { errorMessage, LOAD_FAILED } from '../lib/messages';
-import { loadLabelSize, saveLabelSize } from '../print/labelSettings';
+import { loadDensity, saveDensity } from '../printer/density';
+import { usePrinter } from '../printer/PrinterContext';
+import { UNSUPPORTED_MESSAGE } from '../printer/printerService';
 
 type Message = { text: string; error: boolean } | null;
 
@@ -94,13 +96,79 @@ function moved<T>(list: T[], index: number, direction: -1 | 1): T[] {
   return next;
 }
 
+function printerSummary(state: ReturnType<typeof usePrinter>['state']): string {
+  if (state.status === 'ready' || state.status === 'printing') {
+    const roll = state.media ? `Etikett ${state.media.lengthMm} × ${state.media.widthMm} mm` : 'Rolle nicht erkannt';
+    return `Verbunden: ${state.model} · ${roll}`;
+  }
+  if (state.status === 'connecting') return 'Verbinde …';
+  return 'Nicht verbunden';
+}
+
+function PrinterSettings() {
+  const { state, connect, disconnect } = usePrinter();
+  const [density, setDensity] = useState(loadDensity);
+  const [saved, setSaved] = useState(false);
+
+  function saveDensityForm(e: FormEvent) {
+    e.preventDefault();
+    saveDensity(density);
+    setDensity(loadDensity());
+    setSaved(true);
+  }
+
+  return (
+    <section aria-labelledby="printer-heading">
+      <h2 id="printer-heading">Drucker</h2>
+      <div className="card form">
+        {state.status === 'unsupported' ? (
+          <p className="hint">{UNSUPPORTED_MESSAGE}</p>
+        ) : (
+          <>
+            <p>{printerSummary(state)}</p>
+            {state.status === 'error' && <p className="error">{state.message}</p>}
+            <div className="row">
+              {state.status === 'ready' || state.status === 'printing' ? (
+                <button type="button" className="secondary" onClick={() => void disconnect()}>
+                  Trennen
+                </button>
+              ) : (
+                <button type="button" disabled={state.status === 'connecting'} onClick={() => void connect()}>
+                  Drucker verbinden
+                </button>
+              )}
+            </div>
+          </>
+        )}
+        <form className="row" onSubmit={saveDensityForm}>
+          <label>
+            Druckdichte (1–9)
+            <input
+              type="number"
+              min={1}
+              max={9}
+              className="months"
+              value={density}
+              onChange={(e) => {
+                setDensity(Number(e.target.value));
+                setSaved(false);
+              }}
+            />
+          </label>
+          <button type="submit">Druckdichte speichern</button>
+          {saved && <span className="notice">Gespeichert</span>}
+        </form>
+      </div>
+    </section>
+  );
+}
+
 export function SettingsPage() {
   const repo = useRepository();
   const [freezers, setFreezers] = useState<FreezerWithCompartments[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [message, setMessage] = useState<Message>(null);
   const [newMonths, setNewMonths] = useState(6);
-  const [labelSize, setLabelSize] = useState(loadLabelSize);
 
   const reload = useCallback(async () => {
     try {
@@ -139,12 +207,6 @@ export function SettingsPage() {
     run(() =>
       Promise.all(next.map((item, i) => (item.sort_order === i ? null : save({ ...item, sort_order: i })))),
     );
-  }
-
-  function saveSize(e: FormEvent) {
-    e.preventDefault();
-    saveLabelSize(labelSize);
-    setMessage({ text: 'Gespeichert', error: false });
   }
 
   return (
@@ -235,30 +297,7 @@ export function SettingsPage() {
         </div>
       </section>
 
-      <section aria-labelledby="label-heading">
-        <h2 id="label-heading">Label</h2>
-        <form className="card row" onSubmit={saveSize}>
-          <label>
-            Breite (mm)
-            <input
-              type="number"
-              min={10}
-              value={labelSize.widthMm}
-              onChange={(e) => setLabelSize({ ...labelSize, widthMm: Number(e.target.value) })}
-            />
-          </label>
-          <label>
-            Höhe (mm)
-            <input
-              type="number"
-              min={10}
-              value={labelSize.heightMm}
-              onChange={(e) => setLabelSize({ ...labelSize, heightMm: Number(e.target.value) })}
-            />
-          </label>
-          <button type="submit">Labelgröße speichern</button>
-        </form>
-      </section>
+      <PrinterSettings />
     </div>
   );
 }

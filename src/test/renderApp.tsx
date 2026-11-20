@@ -2,6 +2,8 @@ import { render } from '@testing-library/react';
 import App from '../App';
 import { createMemoryRepository } from '../data/memoryRepository';
 import type { Repository } from '../data/repository';
+import type { Printer } from '../printer/printerService';
+import { fakePrinter } from './fakePrinter';
 import { cellar, drawer2, kitchen, meat, top, veg } from './fixtures';
 
 export function seededRepository(overrides: Parameters<typeof createMemoryRepository>[0] = {}) {
@@ -14,7 +16,7 @@ export function seededRepository(overrides: Parameters<typeof createMemoryReposi
   });
 }
 
-export function renderApp(route: string, repo: Repository = seededRepository()) {
+export function renderApp(route: string, repo: Repository = seededRepository(), printer: Printer = fakePrinter()) {
   window.location.hash = route;
-  return { repo, ...render(<App repo={repo} />) };
+  return { repo, printer, ...render(<App repo={repo} printer={printer} />) };
 }

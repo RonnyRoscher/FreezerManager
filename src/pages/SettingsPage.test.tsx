@@ -2,7 +2,9 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderApp, seededRepository } from '../test/renderApp';
 import { drawer2, meat } from '../test/fixtures';
-import { loadLabelSize } from '../print/labelSettings';
+import { loadDensity } from '../printer/density';
+import { fakePrinter } from '../test/fakePrinter';
+import type { PrinterState } from '../printer/printerService';
 
 const item = (id: string) => ({
   id,
@@ -79,14 +81,60 @@ test('adds a category and changes its shelf life', async () => {
   expect(eis?.max_months).toBe(3);
 });
 
-test('stores the label size', async () => {
-  await openSettings();
-  const width = screen.getByLabelText('Breite (mm)');
-  await userEvent.clear(width);
-  await userEvent.type(width, '54');
-  const height = screen.getByLabelText('Höhe (mm)');
-  await userEvent.clear(height);
-  await userEvent.type(height, '25');
-  await userEvent.click(screen.getByRole('button', { name: 'Labelgröße speichern' }));
-  expect(loadLabelSize()).toEqual({ widthMm: 54, heightMm: 25 });
+async function openPrinterSettings(state?: PrinterState) {
+  const printer = fakePrinter(state);
+  renderApp('#/settings', seededRepository(), printer);
+  const section = await screen.findByRole('region', { name: 'Drucker' });
+  return { printer, section };
+}
+
+test('shows the connected printer and its label roll', async () => {
+  const { printer, section } = await openPrinterSettings();
+  expect(within(section).getByText('Verbunden: T50M Pro · Etikett 40 × 30 mm')).toBeInTheDocument();
+  await userEvent.click(within(section).getByRole('button', { name: 'Trennen' }));
+  expect(printer.disconnect).toHaveBeenCalled();
+});
+
+test('says when the label roll is not recognized', async () => {
+  const { section } = await openPrinterSettings({ status: 'ready', model: 'T50M Pro', media: null });
+  expect(within(section).getByText('Verbunden: T50M Pro · Rolle nicht erkannt')).toBeInTheDocument();
+});
+
+test('offers to connect a printer', async () => {
+  const { printer, section } = await openPrinterSettings({ status: 'disconnected' });
+  expect(within(section).getByText('Nicht verbunden')).toBeInTheDocument();
+  await userEvent.click(within(section).getByRole('button', { name: 'Drucker verbinden' }));
+  expect(printer.connect).toHaveBeenCalled();
+});
+
+test('explains that printing needs Chrome or Edge on a PC', async () => {
+  const { section } = await openPrinterSettings({ status: 'unsupported' });
+  expect(
+    within(section).getByText('Drucken geht nur in Chrome oder Edge am PC mit per USB angeschlossenem Drucker.'),
+  ).toBeInTheDocument();
+  expect(within(section).queryByRole('button', { name: 'Drucker verbinden' })).toBeNull();
+});
+
+test('shows connection errors with a retry', async () => {
+  const { section } = await openPrinterSettings({
+    status: 'error',
+    message: 'Dieses Druckermodell wird nicht unterstützt (USB-ID 0x203e).',
+  });
+  expect(within(section).getByText('Dieses Druckermodell wird nicht unterstützt (USB-ID 0x203e).')).toBeInTheDocument();
+  expect(within(section).getByRole('button', { name: 'Drucker verbinden' })).toBeInTheDocument();
+});
+
+test('stores the print density', async () => {
+  const { section } = await openPrinterSettings();
+  const density = within(section).getByLabelText('Druckdichte (1–9)');
+  expect(density).toHaveValue(4);
+  await userEvent.clear(density);
+  await userEvent.type(density, '6');
+  await userEvent.click(within(section).getByRole('button', { name: 'Druckdichte speichern' }));
+  expect(loadDensity()).toBe(6);
+});
+
+test('no longer asks for a label size', async () => {
+  await openPrinterSettings();
+  expect(screen.queryByLabelText('Breite (mm)')).toBeNull();
 });

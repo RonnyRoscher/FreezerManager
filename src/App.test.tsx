@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
+import { fakePrinter } from './test/fakePrinter';
 import userEvent from '@testing-library/user-event';
 import { renderApp, seededRepository } from './test/renderApp';
 
@@ -43,7 +44,7 @@ test('shows the overview instead of a blank page for unknown routes', async () =
 
 test('shows a message passed from an auth redirect on the login page', async () => {
   window.location.hash = '#/login';
-  render(<App repo={loggedOut()} authMessage="Der Link ist abgelaufen." />);
+  render(<App repo={loggedOut()} printer={fakePrinter()} authMessage="Der Link ist abgelaufen." />);
   expect(await screen.findByText('Der Link ist abgelaufen.')).toBeInTheDocument();
 });
 
