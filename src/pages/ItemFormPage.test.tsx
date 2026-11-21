@@ -159,6 +159,18 @@ describe('printing over Bluetooth from the form', () => {
     expect(printer.print).toHaveBeenCalledWith(expect.objectContaining({ name: 'Gulasch' }));
   });
 
+  test('shows that it is connecting before saving', async () => {
+    const printer = bluetooth();
+    let finish: (connected: boolean) => void = () => {};
+    printer.ensureConnected.mockReturnValueOnce(new Promise<boolean>((resolve) => (finish = resolve)));
+    await openForm(seededRepository(), printer);
+    await fillRequired('Gulasch');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern & Label drucken' }));
+    expect(await screen.findByRole('button', { name: 'Verbinde …' })).toBeDisabled();
+    finish(true);
+    await screen.findByText(/Gespeichert: Gulasch/);
+  });
+
   test('saves without printing when no printer was chosen', async () => {
     const printer = bluetooth();
     printer.ensureConnected.mockResolvedValueOnce(false);

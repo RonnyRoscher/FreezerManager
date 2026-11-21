@@ -9,7 +9,12 @@ export type { MediaSize } from './printJob';
 export type PrinterState =
   | { status: 'unsupported' }
   /** `connectOnPrint`: printing connects by itself (Bluetooth asks for the printer on the first print). */
-  | { status: 'disconnected'; connectOnPrint: boolean }
+  | {
+      status: 'disconnected';
+      connectOnPrint: boolean;
+      /** Bluetooth: a printer was picked earlier, so the next print reconnects without asking. */
+      printerKnown?: boolean;
+    }
   | { status: 'connecting' }
   | { status: 'ready'; model: string; media: MediaSize | null }
   | { status: 'printing'; model: string; media: MediaSize | null }

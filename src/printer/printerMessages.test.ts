@@ -54,3 +54,16 @@ describe('Bluetooth', () => {
     expect(bluetoothErrorMessage(new PrinterError('Label cover is open', 'device'))).toBe('Der Deckel des Druckers ist offen.');
   });
 });
+
+describe('remaining English driver messages', () => {
+  test.each([
+    [new PrinterError('Printer is already printing, try again shortly', 'busy'), 'Der Drucker druckt gerade noch. Bitte kurz warten.'],
+    [new PrinterError('Printing was stopped on the device', 'stopped'), 'Der Druck wurde am Drucker abgebrochen.'],
+    [new PrinterError('Cancelled', 'cancelled'), 'Der Druck wurde abgebrochen.'],
+    [new PrinterError('This design is too detailed for the T50M to take in one transfer', 'label'), 'Das Etikett ist zu detailliert für den Drucker.'],
+    [new PrinterError('Label not recognized', 'device'), 'Etikett nicht erkannt. Ist eine passende Katasymbol-Rolle eingelegt?'],
+    [new PrinterError('Check remaining labels', 'device'), 'Bitte die verbleibenden Etiketten prüfen.'],
+  ])('%s', (error, text) => {
+    expect(printerErrorMessage(error)).toBe(text);
+  });
+});

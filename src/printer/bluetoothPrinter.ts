@@ -5,7 +5,6 @@ import { WebBluetoothTransport } from './vendor/ble';
 import { bluetoothModelName } from './vendor/devices';
 import { T5080BtDriver } from './vendor/families/t5080-bt';
 
-const DISCONNECTED: PrinterState = { status: 'disconnected', connectOnPrint: true };
 const UNSUPPORTED_MODEL = 'Dieses Druckermodell wird nicht unterstützt.';
 const LINK_LOST = 'Drucker wurde getrennt.';
 
@@ -17,7 +16,7 @@ const userMessage = (e: unknown) => (e instanceof PrinterUserError ? e.message :
  * link is re-established without asking again.
  */
 export function createBluetoothPrinter(): Printer {
-  let state: PrinterState = DISCONNECTED;
+  let state: PrinterState = { status: 'disconnected', connectOnPrint: true, printerKnown: false };
   const listeners = new Set<(s: PrinterState) => void>();
   let device: BluetoothDevice | null = null;
   let model = '';
@@ -26,6 +25,8 @@ export function createBluetoothPrinter(): Printer {
   let printing = false;
   let linkLost = false;
   const listening = new WeakSet<BluetoothDevice>();
+
+  const disconnected = (): PrinterState => ({ status: 'disconnected', connectOnPrint: true, printerKnown: device !== null });
 
   function setState(next: PrinterState) {
     state = next;
@@ -37,7 +38,7 @@ export function createBluetoothPrinter(): Printer {
     driver = null;
     transport = null;
     if (printing) linkLost = true;
-    setState(DISCONNECTED);
+    setState(disconnected());
   }
 
   /** Shows the chooser; null when the user cancels. */
@@ -85,7 +86,7 @@ export function createBluetoothPrinter(): Printer {
     try {
       await open(d);
     } catch (e) {
-      setState(DISCONNECTED);
+      setState(disconnected());
       throw new PrinterUserError(userMessage(e));
     }
   }
@@ -132,7 +133,7 @@ export function createBluetoothPrinter(): Printer {
       transport = null;
       await t?.close().catch(() => {});
       await d?.forget?.().catch(() => {});
-      setState(DISCONNECTED);
+      setState(disconnected());
     },
     ensureConnected,
     async print(item) {

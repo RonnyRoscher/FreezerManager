@@ -138,13 +138,22 @@ function PrinterSettings() {
           <>
             <p>{printerSummary(state)}</p>
             {state.status === 'disconnected' && state.connectOnPrint && (
-              <p className="hint">Per Bluetooth. Nach dem Öffnen der App beim ersten Druck den Drucker einmal auswählen.</p>
+              <p className="hint">
+                {state.printerKnown
+                  ? 'Per Bluetooth. Der nächste Druck verbindet sich wieder mit dem Drucker.'
+                  : 'Per Bluetooth. Nach dem Öffnen der App beim ersten Druck den Drucker einmal auswählen.'}
+              </p>
             )}
             {state.status === 'error' && <p className="error">{state.message}</p>}
             {connectError && <p className="error">{connectError}</p>}
             <div className="row">
               {state.status === 'ready' || state.status === 'printing' ? (
-                <button type="button" className="secondary" onClick={() => void disconnect()}>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={state.status === 'printing'}
+                  onClick={() => void disconnect()}
+                >
                   Trennen
                 </button>
               ) : (

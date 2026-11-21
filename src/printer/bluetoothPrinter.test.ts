@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 test('uses Bluetooth when there is no WebHID and asks for the printer on print', () => {
-  expect(setup().getState()).toEqual({ status: 'disconnected', connectOnPrint: true });
+  expect(setup().getState()).toEqual({ status: 'disconnected', connectOnPrint: true, printerKnown: false });
 });
 
 test('connects to the chosen printer', async () => {
@@ -51,7 +51,7 @@ test('reconnects without the chooser after the link dropped', async () => {
   const printer = setup();
   await printer.connect();
   fake.dropConnection();
-  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true });
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true, printerKnown: true });
   await printer.print(makeItem());
   expect(fake.requestDevice).toHaveBeenCalledTimes(1);
   expect(fake.connect).toHaveBeenCalledTimes(2);
@@ -63,7 +63,7 @@ test('does nothing when the chooser is cancelled', async () => {
   await expect(printer.print(makeItem())).resolves.toBeUndefined();
   expect(fake.commands()).toEqual([]);
   await expect(printer.ensureConnected()).resolves.toBe(false);
-  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true });
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true, printerKnown: false });
 });
 
 test('says when Bluetooth is off', async () => {
@@ -79,7 +79,7 @@ test('retries on the next tap when the printer was unreachable', async () => {
   await expect(printer.print(makeItem())).rejects.toThrow(
     'Drucker per Bluetooth nicht erreichbar. Ist er eingeschaltet und in der Nähe?',
   );
-  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true });
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true, printerKnown: true });
   fake.options.connectFails = false;
   await printer.print(makeItem());
   expect(fake.requestDevice).toHaveBeenCalledTimes(1);
@@ -107,7 +107,7 @@ test('says when the printer does not answer', async () => {
   const connect = expect(printer.connect()).rejects.toThrow('Drucker antwortet nicht. Ist er eingeschaltet und in der Nähe?');
   await vi.advanceTimersByTimeAsync(20000);
   await connect;
-  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true });
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true, printerKnown: true });
 });
 
 test('prints only once when asked twice at the same time', async () => {
@@ -127,7 +127,7 @@ test('reports a link lost during a print', async () => {
   await vi.waitFor(() => expect(fake.commands()).toContain(0x13));
   fake.dropConnection();
   await assertion;
-  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true });
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true, printerKnown: true });
 });
 
 test('forgets the printer on disconnect', async () => {
@@ -135,7 +135,7 @@ test('forgets the printer on disconnect', async () => {
   await printer.connect();
   await printer.disconnect();
   expect(fake.device.forget).toHaveBeenCalled();
-  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true });
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true, printerKnown: false });
   await printer.print(makeItem());
   expect(fake.requestDevice).toHaveBeenCalledTimes(2);
 });
@@ -167,4 +167,14 @@ test('a late disconnect event of an old link does not drop the current connectio
   expect(printer.getState()).toEqual(ready);
   await printer.print(makeItem());
   expect(fake.connect).toHaveBeenCalledTimes(2);
+});
+
+test('tells whether a printer is remembered', async () => {
+  const printer = setup();
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true, printerKnown: false });
+  await printer.connect();
+  fake.dropConnection();
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true, printerKnown: true });
+  await printer.disconnect();
+  expect(printer.getState()).toEqual({ status: 'disconnected', connectOnPrint: true, printerKnown: false });
 });

@@ -16,12 +16,22 @@ const DEVICE_ERRORS: Record<string, string> = {
   'No label detected': 'Kein Etikett erkannt.',
   'Out of labels': 'Keine Etiketten mehr.',
   'Print head is too hot': 'Der Druckkopf ist zu heiß. Bitte kurz warten.',
+  'Label not recognized': 'Etikett nicht erkannt. Ist eine passende Katasymbol-Rolle eingelegt?',
+  'Check remaining labels': 'Bitte die verbleibenden Etiketten prüfen.',
+};
+
+const CODE_ERRORS: Record<string, string> = {
+  busy: 'Der Drucker druckt gerade noch. Bitte kurz warten.',
+  stopped: 'Der Druck wurde am Drucker abgebrochen.',
+  cancelled: 'Der Druck wurde abgebrochen.',
+  label: 'Das Etikett ist zu detailliert für den Drucker.',
 };
 
 export function printerErrorMessage(e: unknown): string {
   if (e instanceof PrinterUserError) return e.message;
   if (e instanceof PrinterError) {
     if (e.code === 'timeout') return NO_RESPONSE;
+    if (CODE_ERRORS[e.code]) return CODE_ERRORS[e.code];
     // The driver joins several device errors with ", "; the first one is the most important.
     const first = e.message.split(', ')[0];
     if (DEVICE_ERRORS[first]) return DEVICE_ERRORS[first];

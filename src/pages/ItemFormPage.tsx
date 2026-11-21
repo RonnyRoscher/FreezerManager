@@ -73,6 +73,7 @@ export function ItemFormPage() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const printer = usePrinter();
 
   useEffect(() => {
@@ -142,10 +143,13 @@ export function ItemFormPage() {
     let connected = false;
     let connectError = '';
     if (print) {
+      setConnecting(true);
       try {
         connected = await printer.ensureConnected();
       } catch (e) {
         connectError = printFailure(e);
+      } finally {
+        setConnecting(false);
       }
     }
     let saved;
@@ -286,7 +290,7 @@ export function ItemFormPage() {
             disabled={busy || !canPrint(printer.state)}
             onClick={() => save(true)}
           >
-            {printing ? 'Druckt …' : 'Speichern & Label drucken'}
+            {connecting ? 'Verbinde …' : printing ? 'Druckt …' : 'Speichern & Label drucken'}
           </button>
         </div>
         <PrinterHint state={printer.state} />

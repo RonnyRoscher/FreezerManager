@@ -150,3 +150,14 @@ test('explains Bluetooth printing on the phone', async () => {
   await userEvent.click(within(section).getByRole('button', { name: 'Drucker verbinden' }));
   expect(await within(section).findByText('Dieses Druckermodell wird nicht unterstützt.')).toBeInTheDocument();
 });
+
+test('cannot disconnect while printing', async () => {
+  const { section } = await openPrinterSettings({ status: 'printing', model: 'T50M Pro', media: { lengthMm: 40, widthMm: 30 } });
+  expect(within(section).getByRole('button', { name: 'Trennen' })).toBeDisabled();
+});
+
+test('tells that a remembered Bluetooth printer reconnects on the next print', async () => {
+  const { section } = await openPrinterSettings({ status: 'disconnected', connectOnPrint: true, printerKnown: true });
+  expect(within(section).getByText('Per Bluetooth. Der nächste Druck verbindet sich wieder mit dem Drucker.')).toBeInTheDocument();
+  expect(within(section).queryByText(/beim ersten Druck/)).toBeNull();
+});
