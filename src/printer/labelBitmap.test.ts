@@ -57,3 +57,29 @@ test('prints the short code in a sans-serif font that Android has', () => {
   expect(fonts.K7F3).toMatch(/Arial/);
   expect(fonts.K7F3).not.toMatch(/Courier/);
 });
+
+function drawnTexts(item: Parameters<typeof drawLabel>[1]) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d')!;
+  const texts: string[] = [];
+  const fillText = ctx.fillText.bind(ctx);
+  ctx.fillText = (text: string, x: number, y: number) => {
+    texts.push(text);
+    fillText(text, x, y);
+  };
+  vi.spyOn(canvas, 'getContext').mockReturnValue(ctx);
+  drawLabel(canvas, item, size);
+  return texts;
+}
+
+test('leaves out the category', () => {
+  expect(drawnTexts(makeItem())).not.toContain('Fleisch');
+});
+
+test('shows quantity and details on up to two lines', () => {
+  const texts = drawnTexts(makeItem({ quantity: '200g', details: '50% Fichtenreizker, Rest Maronen' }));
+  const start = texts.findIndex((t) => t.startsWith('200g'));
+  expect(start).toBeGreaterThan(-1);
+  expect(texts[start + 1]).toMatch(/Fichtenreizker|Rest|Maronen/);
+  expect(texts.join(' ')).toContain('Fichtenreizker');
+});

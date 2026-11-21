@@ -45,8 +45,8 @@ export function drawLabel(canvas: HTMLCanvasElement, item: ItemView, size: Label
   const bodyFont = `${g.fontPx.body}px ${SANS}`;
   const lines: TextLine[] = [
     ...wrap(content.name, nameFont, g.fontPx.name, 2),
-    ...(content.extra ? wrap(content.extra, bodyFont, g.fontPx.body, 1) : []),
-    ...wrap(content.category, bodyFont, g.fontPx.body, 1),
+    // No category on the label: quantity and details get two lines instead.
+    ...(content.extra ? wrap(content.extra, bodyFont, g.fontPx.body, 2) : []),
     ...wrap(content.date, bodyFont, g.fontPx.body, 1),
     ...wrap(content.location, bodyFont, g.fontPx.body, 2),
     // Sans-serif: Android has no Courier New and would fall back to a serif font.

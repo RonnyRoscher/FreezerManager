@@ -12,7 +12,6 @@ export function labelLines(item: ItemView) {
   return {
     name: item.name,
     extra: extra || null,
-    category: item.category.name,
     date: formatDate(item.frozen_at),
     location: `${item.freezer.name} › ${item.compartment.name}`,
     code: item.short_code,

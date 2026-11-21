@@ -7,7 +7,6 @@ describe('labelLines', () => {
     expect(lines.extra).toBe('500 g · mit Zwiebeln');
     expect(lines.location).toBe('Keller-Truhe › Schublade 2');
     expect(lines.date).toBe('03.10.2026');
-    expect(lines.category).toBe('Fleisch');
   });
 
   test('omits the separator when only details are set', () => {
