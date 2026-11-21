@@ -2,19 +2,18 @@ import { labelGeometry, labelLines, wrapText } from './labelLayout';
 import { makeItem } from '../test/fixtures';
 
 describe('labelLines', () => {
-  test('joins quantity and details', () => {
+  test('keeps quantity and details apart', () => {
     const lines = labelLines(makeItem({ quantity: '500 g', details: 'mit Zwiebeln', frozen_at: '2026-10-03' }));
-    expect(lines.extra).toBe('500 g · mit Zwiebeln');
+    expect(lines.quantity).toBe('500 g');
+    expect(lines.details).toBe('mit Zwiebeln');
     expect(lines.location).toBe('Keller-Truhe › Schublade 2');
     expect(lines.date).toBe('03.10.2026');
   });
 
-  test('omits the separator when only details are set', () => {
-    expect(labelLines(makeItem({ quantity: null, details: 'mit Zwiebeln' })).extra).toBe('mit Zwiebeln');
-  });
-
-  test('has no extra line without quantity and details', () => {
-    expect(labelLines(makeItem({ quantity: null, details: null })).extra).toBeNull();
+  test('has no quantity or details lines when they are empty', () => {
+    const lines = labelLines(makeItem({ quantity: null, details: null }));
+    expect(lines.quantity).toBeNull();
+    expect(lines.details).toBeNull();
   });
 });
 

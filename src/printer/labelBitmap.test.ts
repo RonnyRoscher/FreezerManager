@@ -76,10 +76,12 @@ test('leaves out the category', () => {
   expect(drawnTexts(makeItem())).not.toContain('Fleisch');
 });
 
-test('shows quantity and details on up to two lines', () => {
-  const texts = drawnTexts(makeItem({ quantity: '200g', details: '50% Fichtenreizker, Rest Maronen' }));
-  const start = texts.findIndex((t) => t.startsWith('200g'));
-  expect(start).toBeGreaterThan(-1);
-  expect(texts[start + 1]).toMatch(/Fichtenreizker|Rest|Maronen/);
+test('keeps the quantity on its own line and gives the details two lines', () => {
+  const texts = drawnTexts(makeItem({ quantity: '200g', details: '50% Fichtenreizker, Rest Maronen und Steinpilze' }));
+  const quantity = texts.indexOf('200g');
+  expect(quantity).toBeGreaterThan(-1);
+  expect(texts[quantity + 1]).toMatch(/^50%/);
+  expect(texts[quantity + 2]).toBeDefined();
+  expect(texts[quantity + 2]).not.toMatch(/^\d{2}\.\d{2}\.\d{4}$/);
   expect(texts.join(' ')).toContain('Fichtenreizker');
 });

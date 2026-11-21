@@ -8,10 +8,10 @@ const DOTS_PER_MM = 8;
 const ELLIPSIS = '…';
 
 export function labelLines(item: ItemView) {
-  const extra = [item.quantity, item.details].filter(Boolean).join(' · ');
   return {
     name: item.name,
-    extra: extra || null,
+    quantity: item.quantity || null,
+    details: item.details || null,
     date: formatDate(item.frozen_at),
     location: `${item.freezer.name} › ${item.compartment.name}`,
     code: item.short_code,
