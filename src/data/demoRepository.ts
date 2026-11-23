@@ -29,7 +29,16 @@ export function createDemoRepository() {
     frozen_at: addMonths(today, -monthsAgo),
     created_at: new Date().toISOString(),
   });
+  const household = { id: 'demo-h1', name: 'Unser Haushalt' };
+  const me = { userId: 'demo-u1', email: 'demo@example.de' };
   return createMemoryRepository({
+    profile: { ...me, isAdmin: true, household, activeHousehold: household },
+    households: [household],
+    // A second account without household, so assigning members can be tried out.
+    profiles: [
+      { ...me, isAdmin: true, householdId: household.id },
+      { userId: 'demo-u2', email: 'gast@example.de', isAdmin: false, householdId: null },
+    ],
     freezers,
     compartments,
     categories,

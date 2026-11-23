@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createDb, addUser, asUser, applyMigration } from '../src/test/supabaseDb';
 
 describe('SQL test harness (0001 only)', () => {
@@ -533,5 +534,39 @@ describe('0002 admin functions', () => {
     await db.query('delete from auth.users where id = $1', [a]);
     expect((await db.query('select 1 from profiles where user_id = $1', [a])).rows).toEqual([]);
     expect(await snapshot(db, A)).toEqual(beforeA);
+  });
+});
+
+describe('supabase/check-migration.sql', () => {
+  const sql = readFileSync('supabase/check-migration.sql', 'utf8');
+  const part1 = sql.slice(sql.indexOf('-- TEIL 1'), sql.indexOf('-- TEIL 2'));
+  const part2 = sql.slice(sql.indexOf('-- TEIL 2'));
+  const run = async (db: Db, text: string) => {
+    const results = await db.exec(text);
+    return results.filter((r) => r.fields.length > 0).map((r) => r.rows as Record<string, unknown>[]);
+  };
+
+  it('part 1 runs on 0001 alone and counts every table', async () => {
+    const { db } = await seededLegacyDb();
+    const [rows] = await run(db, part1);
+    expect(rows.map((r) => [r.tabelle, Number(r.zeilen)])).toEqual([
+      ['categories', 10],
+      ['compartments', 2],
+      ['freezers', 1],
+      ['items', 3],
+    ]);
+  });
+
+  it('both parts run after 0002, same counts, nothing without household', async () => {
+    const { db } = await seededLegacyDb();
+    await applyMigration(db, '0002');
+    const [counts] = await run(db, part1);
+    expect(counts.map((r) => Number(r.zeilen))).toEqual([10, 2, 1, 3]);
+    const [perHousehold, orphans] = await run(db, part2);
+    expect(perHousehold).toHaveLength(1);
+    expect(perHousehold[0]).toMatchObject({ haushalt: 'Unser Haushalt' });
+    expect(['freezers', 'compartments', 'categories', 'items', 'mitglieder'].map((k) => Number(perHousehold[0][k]))).toEqual([1, 2, 10, 3, 2]);
+    expect(orphans).toHaveLength(5);
+    expect(orphans.every((r) => Number(r.ohne_haushalt) === 0)).toBe(true);
   });
 });

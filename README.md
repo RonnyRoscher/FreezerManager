@@ -20,10 +20,20 @@ Design und Plan: `docs/superpowers/specs/` und `docs/superpowers/plans/`.
 
 1. Unter [supabase.com](https://supabase.com) kostenlos ein Projekt anlegen, Region
    **EU (z. B. Frankfurt)** wählen.
-2. **SQL Editor** öffnen, den Inhalt von `supabase/migrations/0001_init.sql` einfügen und
-   ausführen. Das legt Tabellen, Zugriffsregeln und Standardkategorien an.
+2. **SQL Editor** öffnen, nacheinander den Inhalt von `supabase/migrations/0001_init.sql` und
+   `supabase/migrations/0002_households.sql` einfügen und ausführen. Das legt Tabellen,
+   Zugriffsregeln und Standardkategorien an sowie den leeren Haushalt „Unser Haushalt“.
+   (Bestehendes Projekt? Dann siehe „Umstellung auf Haushalte“ weiter unten.)
 3. **Authentication › Users › Add user**: eigenen Nutzer (E-Mail + Passwort) anlegen,
-   „Auto Confirm User“ aktivieren.
+   „Auto Confirm User“ aktivieren. Anschließend im SQL Editor sich selbst in den Haushalt
+   aufnehmen und zum Admin machen:
+
+   ```sql
+   update public.profiles
+     set is_admin = true,
+         household_id = (select id from public.households where name = 'Unser Haushalt')
+     where email = '<deine E-Mail>';
+   ```
 4. **Authentication › Sign In / Providers**: „Allow new users to sign up“ **deaktivieren**,
    damit sich niemand sonst registrieren kann.
 5. **Project Settings › API**: `Project URL` und den `anon public` Key notieren.
@@ -102,6 +112,68 @@ Der Kamerazugriff funktioniert nur über HTTPS – GitHub Pages erfüllt das.
   Nutzer mit „Auto Confirm User“ neu anlegen.
 - **„Der Link ist abgelaufen oder wurde schon benutzt.“** – Links gelten nur einmal und
   nur kurz. Einen neuen anfordern und nur einmal anklicken.
+
+## Mehrere Haushalte
+
+Jeder Haushalt hat eigene Gefriergeräte, Fächer, Kategorien und Lebensmittel; niemand sieht
+die Daten eines anderen Haushalts. Jedes Konto gehört zu genau einem Haushalt. **Admins**
+(`is_admin`) können zusätzlich Haushalte verwalten.
+
+- **Konto anlegen:** in Supabase unter **Authentication › Users › Add user** (E-Mail +
+  Passwort, „Auto Confirm User“ aktivieren). Das Konto hat zunächst keinen Haushalt und sieht
+  nichts.
+- **Zuordnen:** in der App auf der Seite **Verwaltung** (nur für Admins) das Konto dem
+  gewünschten Haushalt zuweisen. Daten werden dabei nie verschoben oder gelöscht.
+- **Haushalt anlegen / umbenennen:** ebenfalls auf der Verwaltungsseite. Ein neuer Haushalt
+  bekommt die Standardkategorien.
+- **Haushalt öffnen:** Admins können jeden Haushalt öffnen und darin arbeiten; ein Hinweis
+  zeigt den geöffneten Haushalt, „Zurück zu meinem Haushalt“ führt in den eigenen.
+- **Löschen** geht nur bei Haushalten ohne Mitglieder, Gefriergeräte und Lebensmittel.
+- **Weiteren Admin ernennen** (im SQL Editor):
+
+  ```sql
+  update public.profiles set is_admin = true where email = '<E-Mail des Kontos>';
+  ```
+
+## Umstellung auf Haushalte (einmalig)
+
+Gilt für ein **bestehendes** Projekt, das bisher nur `0001_init.sql` kennt. Die Migration
+`0002_households.sql` ändert nichts an den Daten: alle Zeilen und Konten wandern in den
+Haushalt „Unser Haushalt“, nichts wird gelöscht. Die bisherige App läuft währenddessen
+unverändert weiter. Trotzdem sicherheitshalber in dieser Reihenfolge:
+
+1. **Sicherung:** im Supabase-Dashboard unter **Table Editor** die vier Tabellen `freezers`,
+   `compartments`, `categories` und `items` jeweils als CSV exportieren und aufheben.
+2. **Test-Projekt:** ein zweites kostenloses Supabase-Projekt anlegen und dort
+   `0001_init.sql` ausführen. Beispieldaten einfügen, z. B.:
+
+   ```sql
+   insert into freezers (name) values ('Keller');
+   insert into compartments (freezer_id, name)
+     select id, 'Fach 1' from freezers where name = 'Keller';
+   insert into items (short_code, name, category_id, compartment_id, frozen_at)
+     select 'T1ST', 'Gulasch', k.id, c.id, current_date
+     from categories k, compartments c where k.name = 'Fleisch' and c.name = 'Fach 1';
+   ```
+
+   Dann `supabase/check-migration.sql` **Teil 1** ausführen und die Zahlen notieren,
+   anschließend `0002_households.sql` ausführen und **Teil 1 und Teil 2** der Prüfung
+   ausführen. Erwartet: Teil 1 liefert dieselben Zeilenzahlen je Tabelle wie vorher, Teil 2a
+   zeigt einen Haushalt „Unser Haushalt“ mit allen Zeilen, Teil 2b liefert überall `0`
+   (keine Zeile ohne Haushalt).
+3. **Produktion:** im echten Projekt zuerst `check-migration.sql` **Teil 1** ausführen und
+   die Zahlen notieren, dann `0002_households.sql`, danach Teil 1 und Teil 2 erneut. Die
+   Zahlen müssen gleich sein, Teil 2b muss überall `0` zeigen. Die bisherige App
+   funktioniert in der Zwischenzeit weiter.
+4. **Admin:** das eigene Konto ist durch die Migration schon im Haushalt „Unser Haushalt“;
+   nur noch zum Admin machen:
+
+   ```sql
+   update public.profiles set is_admin = true where email = '<deine E-Mail>';
+   ```
+5. **Neue App:** den neuen Stand auf `main` pushen; der Workflow stellt ihn auf GitHub Pages
+   bereit. Danach die App einmal neu laden und prüfen, dass alle Daten da sind und die Seite
+   **Verwaltung** erscheint.
 
 ## Lokale Entwicklung
 
