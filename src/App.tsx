@@ -1,5 +1,6 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
+import { ProfileProvider } from './auth/ProfileContext';
 import { RequireAuth } from './auth/RequireAuth';
 import { Layout } from './components/Layout';
 import { RepositoryProvider } from './data/RepositoryContext';
@@ -34,7 +35,9 @@ export default function App({
               <Route
                 element={
                   <RequireAuth>
-                    <Layout />
+                    <ProfileProvider>
+                      <Layout />
+                    </ProfileProvider>
                   </RequireAuth>
                 }
               >
