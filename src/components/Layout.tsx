@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useProfile } from '../auth/ProfileContext';
 import { useRepository } from '../data/RepositoryContext';
 import { NoHouseholdPage } from '../pages/NoHouseholdPage';
@@ -14,6 +14,7 @@ const links = [
 export function Layout() {
   const repo = useRepository();
   const { profile, loading, error, reload } = useProfile();
+  const { pathname } = useLocation();
   if (loading) return <p className="status">Laden …</p>;
   if (!profile) {
     return error ? (
@@ -25,13 +26,15 @@ export function Layout() {
       </main>
     ) : null;
   }
-  if (!profile.activeHousehold) return <NoHouseholdPage />;
+  // An admin without household must still reach the admin page to fix that.
+  const adminOnly = !profile.activeHousehold && profile.isAdmin && pathname === '/admin';
+  if (!profile.activeHousehold && !adminOnly) return <NoHouseholdPage />;
   const all = profile.isAdmin ? [...links, { to: '/admin', label: 'Verwaltung', icon: '⚑' }] : links;
   return (
     <div className="layout">
       <header className="topbar">
         <span className="brand">FreezerManager</span>
-        <span className="household-name">{profile.activeHousehold.name}</span>
+        <span className="household-name">{profile.activeHousehold?.name}</span>
         <nav className="nav">
           {all.map((l) => (
             <NavLink key={l.to} to={l.to} end={l.to === '/'}>
@@ -45,7 +48,7 @@ export function Layout() {
         </button>
       </header>
       <HouseholdBanner />
-      <main className="page" key={profile.activeHousehold.id}>
+      <main className="page" key={profile.activeHousehold?.id ?? 'none'}>
         <Outlet />
       </main>
     </div>

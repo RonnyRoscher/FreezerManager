@@ -1,12 +1,13 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
-import { ProfileProvider } from './auth/ProfileContext';
+import { ProfileProvider, useProfile } from './auth/ProfileContext';
 import { RequireAuth } from './auth/RequireAuth';
 import { Layout } from './components/Layout';
 import { RepositoryProvider } from './data/RepositoryContext';
 import type { Repository } from './data/repository';
 import { PrinterProvider } from './printer/PrinterContext';
 import type { Printer } from './printer/printerService';
+import { AdminPage } from './pages/AdminPage';
 import { ItemDetailPage } from './pages/ItemDetailPage';
 import { ItemFormPage } from './pages/ItemFormPage';
 import { LoginPage } from './pages/LoginPage';
@@ -15,6 +16,11 @@ import { ScanPage } from './pages/ScanPage';
 import { SetPasswordPage } from './pages/SetPasswordPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { TakePage } from './pages/TakePage';
+
+function AdminRoute() {
+  const { profile } = useProfile();
+  return profile?.isAdmin ? <AdminPage /> : <Navigate to="/" replace />;
+}
 
 export default function App({
   repo,
@@ -48,6 +54,7 @@ export default function App({
                 <Route path="scan" element={<ScanPage />} />
                 <Route path="take/:id" element={<TakePage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="admin" element={<AdminRoute />} />
                 <Route path="passwort" element={<SetPasswordPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
