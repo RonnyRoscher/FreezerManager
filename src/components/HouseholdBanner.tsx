@@ -1,7 +1,7 @@
 import { useProfile } from '../auth/ProfileContext';
 
 export function HouseholdBanner() {
-  const { profile, switchHousehold } = useProfile();
+  const { profile, switchHousehold, switchError } = useProfile();
   const active = profile?.activeHousehold;
   if (!profile || !active || active.id === profile.household?.id) return null;
   return (
@@ -10,6 +10,7 @@ export function HouseholdBanner() {
       <button type="button" onClick={() => void switchHousehold(null)}>
         Zurück zu meinem Haushalt
       </button>
+      {switchError && <span role="alert">{switchError}</span>}
     </div>
   );
 }

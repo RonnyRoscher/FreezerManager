@@ -56,3 +56,61 @@ test('reloads the profile when the page becomes visible again', async () => {
   document.dispatchEvent(new Event('visibilitychange'));
   expect(await screen.findByText('Haushalt: Müller')).toBeInTheDocument();
 });
+
+test('a failing profile load offers a retry instead of the no-household hint', async () => {
+  const repo = seededRepository({ profile: profile() });
+  const real = repo.getProfile.bind(repo);
+  const spy = vi.spyOn(repo, 'getProfile').mockRejectedValueOnce(new Error('offline'));
+  renderApp('#/', repo);
+  expect(await screen.findByText('Profil konnte nicht geladen werden.')).toBeInTheDocument();
+  expect(screen.queryByText(/noch keinem Haushalt/)).not.toBeInTheDocument();
+  spy.mockImplementation(real);
+  await userEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }));
+  expect(await screen.findByText('Unser Haushalt')).toBeInTheDocument();
+});
+
+test('a failing household switch shows a message and keeps the app usable', async () => {
+  const repo = seededRepository({ profile: profile({ activeHousehold: mueller }), households: [own, mueller] });
+  vi.spyOn(repo, 'setActiveHousehold').mockRejectedValueOnce(new Error('boom'));
+  renderApp('#/', repo);
+  await userEvent.click(await screen.findByRole('button', { name: 'Zurück zu meinem Haushalt' }));
+  expect(await screen.findByText('Wechsel fehlgeschlagen. Bitte erneut versuchen.')).toBeInTheDocument();
+  expect(screen.getByText('Haushalt: Müller')).toBeInTheDocument();
+});
+
+test('an older profile response never overwrites a newer one', async () => {
+  const repo = seededRepository({ profile: profile(), households: [own, mueller] });
+  const real = repo.getProfile.bind(repo);
+  renderApp('#/', repo);
+  expect(await screen.findByText('Unser Haushalt')).toBeInTheDocument();
+  let resolveOld!: (p: Profile | null) => void;
+  const old = new Promise<Profile | null>((r) => (resolveOld = r));
+  const oldSnapshot = await real();
+  vi.spyOn(repo, 'getProfile').mockImplementationOnce(() => old).mockImplementation(real);
+  document.dispatchEvent(new Event('visibilitychange')); // slow, old
+  await repo.setActiveHousehold('h-m');
+  document.dispatchEvent(new Event('visibilitychange')); // fast, new
+  expect(await screen.findByText('Haushalt: Müller')).toBeInTheDocument();
+  resolveOld({ ...oldSnapshot!, activeHousehold: own });
+  await new Promise((r) => setTimeout(r, 20));
+  expect(screen.getByText('Haushalt: Müller')).toBeInTheDocument();
+});
+
+test('switching back navigates to the overview', async () => {
+  const repo = seededRepository({ profile: profile({ activeHousehold: mueller }), households: [own, mueller] });
+  renderApp('#/settings', repo);
+  await userEvent.click(await screen.findByRole('button', { name: 'Zurück zu meinem Haushalt' }));
+  await waitFor(() => expect(window.location.hash).toBe('#/'));
+});
+
+test('page state is reset when the active household changes', async () => {
+  const repo = seededRepository({ profile: profile(), households: [own, mueller] });
+  renderApp('#/', repo);
+  const search = await screen.findByRole('searchbox');
+  await userEvent.type(search, 'abc');
+  expect(search).toHaveValue('abc');
+  await repo.setActiveHousehold('h-m');
+  document.dispatchEvent(new Event('visibilitychange'));
+  await screen.findByText('Haushalt: Müller');
+  expect(screen.getByRole('searchbox')).toHaveValue('');
+});

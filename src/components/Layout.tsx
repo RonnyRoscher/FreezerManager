@@ -13,9 +13,19 @@ const links = [
 
 export function Layout() {
   const repo = useRepository();
-  const { profile, loading } = useProfile();
+  const { profile, loading, error, reload } = useProfile();
   if (loading) return <p className="status">Laden …</p>;
-  if (!profile || !profile.activeHousehold) return <NoHouseholdPage />;
+  if (!profile) {
+    return error ? (
+      <main className="page">
+        <p className="status">Profil konnte nicht geladen werden.</p>
+        <button type="button" onClick={() => void reload()}>
+          Erneut versuchen
+        </button>
+      </main>
+    ) : null;
+  }
+  if (!profile.activeHousehold) return <NoHouseholdPage />;
   const all = profile.isAdmin ? [...links, { to: '/admin', label: 'Verwaltung', icon: '⚑' }] : links;
   return (
     <div className="layout">

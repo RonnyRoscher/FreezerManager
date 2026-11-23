@@ -6,6 +6,8 @@ import type { Profile } from '../domain/types';
 type ProfileState = {
   profile: Profile | null;
   loading: boolean;
+  error: boolean;
+  switchError: string | null;
   switchHousehold(id: string | null): Promise<void>;
   reload(): Promise<void>;
 };
@@ -13,6 +15,8 @@ type ProfileState = {
 const ProfileContext = createContext<ProfileState>({
   profile: null,
   loading: true,
+  error: false,
+  switchError: null,
   switchHousehold: async () => {},
   reload: async () => {},
 });
@@ -22,17 +26,22 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const activeId = useRef<string | null | undefined>(undefined);
+  const [error, setError] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
+  const requestId = useRef(0);
 
   const reload = useCallback(async () => {
+    const id = ++requestId.current;
     try {
       const next = await repo.getProfile();
-      activeId.current = next?.activeHousehold?.id ?? null;
+      if (id !== requestId.current) return;
       setProfile(next);
+      setError(next === null);
     } catch {
-      // keep the last known profile; the next focus tries again
+      // keep the last known profile; a later focus or the retry button tries again
+      if (id === requestId.current) setError(true);
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   }, [repo]);
 
@@ -51,16 +60,22 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const switchHousehold = useCallback(
     async (id: string | null) => {
-      await repo.setActiveHousehold(id);
-      await reload();
-      navigate('/');
+      setSwitchError(null);
+      try {
+        await repo.setActiveHousehold(id);
+        await reload();
+        navigate('/');
+      } catch {
+        setSwitchError('Wechsel fehlgeschlagen. Bitte erneut versuchen.');
+        await reload();
+      }
     },
     [repo, reload, navigate],
   );
 
   const value = useMemo(
-    () => ({ profile, loading, switchHousehold, reload }),
-    [profile, loading, switchHousehold, reload],
+    () => ({ profile, loading, error, switchError, switchHousehold, reload }),
+    [profile, loading, error, switchError, switchHousehold, reload],
   );
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 }
