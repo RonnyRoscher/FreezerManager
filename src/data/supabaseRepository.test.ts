@@ -64,7 +64,9 @@ describe('subscribeItems', () => {
 describe('households', () => {
   type Result = { data: unknown; error: { message: string } | null };
 
-  function fakeClient(opts: { rpcResult?: Result; tables?: Record<string, unknown>; user?: unknown } = {}) {
+  function fakeClient(
+    opts: { rpcResult?: Result; tables?: Record<string, unknown>; user?: unknown; authError?: { message: string } } = {},
+  ) {
     const rpcCalls: [string, unknown][] = [];
     const tables = opts.tables ?? {};
     const client = {
@@ -73,7 +75,7 @@ describe('households', () => {
         return Promise.resolve(opts.rpcResult ?? { data: null, error: null });
       },
       auth: {
-        getUser: () => Promise.resolve({ data: { user: opts.user ?? null }, error: null }),
+        getUser: () => Promise.resolve({ data: { user: opts.user ?? null }, error: opts.authError ?? null }),
       },
       from: (table: string) => {
         const result = { data: tables[table] ?? null, error: null };
@@ -158,6 +160,11 @@ describe('households', () => {
     const p = await createSupabaseRepository(client).getProfile();
     expect(p?.household).toEqual(households[0]);
     expect(p?.activeHousehold).toEqual(households[1]);
+  });
+
+  test('getProfile: getUser returns an error -> rejects instead of null', async () => {
+    const { client } = fakeClient({ authError: { message: 'network' } });
+    await expect(createSupabaseRepository(client).getProfile()).rejects.toThrow();
   });
 
   test('getProfile: null when not signed in', async () => {

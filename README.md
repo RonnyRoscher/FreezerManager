@@ -22,7 +22,9 @@ Design und Plan: `docs/superpowers/specs/` und `docs/superpowers/plans/`.
    **EU (z. B. Frankfurt)** wählen.
 2. **SQL Editor** öffnen, nacheinander den Inhalt von `supabase/migrations/0001_init.sql` und
    `supabase/migrations/0002_households.sql` einfügen und ausführen. Das legt Tabellen,
-   Zugriffsregeln und Standardkategorien an sowie den leeren Haushalt „Unser Haushalt“.
+   Zugriffsregeln und Standardkategorien an. `0002` legt außerdem den Haushalt „Unser
+   Haushalt“ mit den Standardkategorien an. `0001` und `0002` werden jeweils nur einmal
+   ausgeführt.
    (Bestehendes Projekt? Dann siehe „Umstellung auf Haushalte“ weiter unten.)
 3. **Authentication › Users › Add user**: eigenen Nutzer (E-Mail + Passwort) anlegen,
    „Auto Confirm User“ aktivieren. Anschließend im SQL Editor sich selbst in den Haushalt
@@ -127,7 +129,9 @@ die Daten eines anderen Haushalts. Jedes Konto gehört zu genau einem Haushalt. 
 - **Haushalt anlegen / umbenennen:** ebenfalls auf der Verwaltungsseite. Ein neuer Haushalt
   bekommt die Standardkategorien.
 - **Haushalt öffnen:** Admins können jeden Haushalt öffnen und darin arbeiten; ein Hinweis
-  zeigt den geöffneten Haushalt, „Zurück zu meinem Haushalt“ führt in den eigenen.
+  zeigt den geöffneten Haushalt, „Zurück zu meinem Haushalt“ führt in den eigenen. Den
+  Haushalt am besten immer nur auf einem Gerät wechseln: Die Auswahl gilt für das Konto, andere
+  offene Geräte folgen innerhalb von etwa 30 Sekunden.
 - **Löschen** geht nur bei Haushalten ohne Mitglieder, Gefriergeräte und Lebensmittel.
 - **Weiteren Admin ernennen** (im SQL Editor):
 
@@ -164,7 +168,11 @@ unverändert weiter. Trotzdem sicherheitshalber in dieser Reihenfolge:
 3. **Produktion:** im echten Projekt zuerst `check-migration.sql` **Teil 1** ausführen und
    die Zahlen notieren, dann `0002_households.sql`, danach Teil 1 und Teil 2 erneut. Die
    Zahlen müssen gleich sein, Teil 2b muss überall `0` zeigen. Die bisherige App
-   funktioniert in der Zwischenzeit weiter.
+   funktioniert in der Zwischenzeit weiter. `0002_households.sql` darf nicht ein zweites Mal
+   ausgeführt werden; ein zweiter Lauf schlägt fehl und ändert nichts, weil die Migration eine
+   einzige Transaktion ist. Während `0002` läuft, können offene Apps mehrfach neu laden (jede
+   Zeile bekommt ihren Haushalt, das löst Live-Aktualisierungen aus). Das ist harmlos, am
+   besten läuft die Migration aber, wenn die App gerade nicht benutzt wird.
 4. **Admin:** das eigene Konto ist durch die Migration schon im Haushalt „Unser Haushalt“;
    nur noch zum Admin machen:
 
@@ -172,8 +180,9 @@ unverändert weiter. Trotzdem sicherheitshalber in dieser Reihenfolge:
    update public.profiles set is_admin = true where email = '<deine E-Mail>';
    ```
 5. **Neue App:** den neuen Stand auf `main` pushen; der Workflow stellt ihn auf GitHub Pages
-   bereit. Danach die App einmal neu laden und prüfen, dass alle Daten da sind und die Seite
-   **Verwaltung** erscheint.
+   bereit. Danach die App neu laden und prüfen, dass alle Daten da sind und die Seite
+   **Verwaltung** erscheint. Eventuell ist dafür zweimaliges Neuladen oder ein Schließen und
+   erneutes Öffnen der App nötig (Service-Worker-Update).
 
 ## Lokale Entwicklung
 

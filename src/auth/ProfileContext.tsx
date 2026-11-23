@@ -29,17 +29,21 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
   const requestId = useRef(0);
+  const loaded = useRef(false);
+  const isAdmin = profile?.isAdmin ?? false;
 
   const reload = useCallback(async () => {
     const id = ++requestId.current;
     try {
       const next = await repo.getProfile();
       if (id !== requestId.current) return;
+      if (next === null && loaded.current) return; // never drop a loaded profile on a background refresh
+      loaded.current = next !== null;
       setProfile(next);
       setError(next === null);
     } catch {
       // keep the last known profile; a later focus or the retry button tries again
-      if (id === requestId.current) setError(true);
+      if (id === requestId.current && !loaded.current) setError(true);
     } finally {
       if (id === requestId.current) setLoading(false);
     }
@@ -57,6 +61,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('focus', onVisible);
     };
   }, [reload]);
+
+  // Only admins can have a foreign active household, which another device may change.
+  useEffect(() => {
+    if (!isAdmin) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState !== 'hidden') void reload();
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [isAdmin, reload]);
 
   const switchHousehold = useCallback(
     async (id: string | null) => {

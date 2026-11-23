@@ -176,7 +176,9 @@ export function createSupabaseRepository(client: SupabaseClient): Repository {
       check(await client.from('categories').delete().eq('id', id));
     },
     async getProfile() {
-      const { data: userData } = await client.auth.getUser();
+      const { data: userData, error: authError } = await client.auth.getUser();
+      // A failed token refresh or network error is not "signed out": let the caller keep its state.
+      if (authError) throw new Error(authError.message);
       const user = userData.user;
       if (!user) return null;
       const row = check(
