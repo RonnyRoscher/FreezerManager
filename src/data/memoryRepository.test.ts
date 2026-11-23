@@ -121,3 +121,79 @@ test('signIn rejects the password "falsch"', async () => {
   await repo.signIn('a@b.de', 'geheim');
   expect(await repo.getSession()).toEqual({ email: 'a@b.de' });
 });
+
+describe('households', () => {
+  test('default profile is an admin in their own household', async () => {
+    const profile = await setup().getProfile();
+    expect(profile).toMatchObject({ email: 'ich@example.de', isAdmin: true });
+    expect(profile?.household?.name).toBe('Unser Haushalt');
+    expect(profile?.activeHousehold).toEqual(profile?.household);
+  });
+
+  test('createHousehold lists the household with no members', async () => {
+    const repo = setup();
+    const mueller = await repo.createHousehold('Müller');
+    expect((await repo.listHouseholds()).find((h) => h.id === mueller.id)).toEqual({ ...mueller, memberCount: 0 });
+    expect((await repo.listHouseholds()).find((h) => h.name === 'Unser Haushalt')?.memberCount).toBe(1);
+  });
+
+  test('empty names are rejected', async () => {
+    await expect(setup().createHousehold('  ')).rejects.toThrow('Name darf nicht leer sein');
+  });
+
+  test('setActiveHousehold switches the visible data, null returns to the own one', async () => {
+    const repo = setup();
+    const mueller = await repo.createHousehold('Müller');
+    await repo.setActiveHousehold(mueller.id);
+    expect(await repo.listFreezers()).toEqual([]);
+    const categories = await repo.listCategories();
+    expect(categories).toHaveLength(9);
+    expect(categories.find((c) => c.name === 'Gemüse')?.max_months).toBe(12);
+    expect((await repo.getProfile())?.activeHousehold?.name).toBe('Müller');
+    await repo.setActiveHousehold(null);
+    expect((await repo.listFreezers()).map((f) => f.id)).toEqual([cellar.id, kitchen.id]);
+    expect((await repo.getProfile())?.activeHousehold?.name).toBe('Unser Haushalt');
+  });
+
+  test('deleteHousehold refuses members, freezers and items, in that order', async () => {
+    const repo = setup();
+    const own = (await repo.getProfile())!.household!;
+    await expect(repo.deleteHousehold(own.id)).rejects.toThrow('Haushalt kann nicht gelöscht werden: noch Mitglieder');
+    const h = await repo.createHousehold('Müller');
+    await repo.setActiveHousehold(h.id);
+    const f = await repo.saveFreezer({ name: 'Truhe', sort_order: 0 });
+    await expect(repo.deleteHousehold(h.id)).rejects.toThrow('Haushalt kann nicht gelöscht werden: noch Gefriergeräte');
+    await repo.deleteFreezer(f.id);
+    await repo.deleteHousehold(h.id);
+    expect((await repo.listHouseholds()).some((x) => x.id === h.id)).toBe(false);
+    expect((await repo.getProfile())?.activeHousehold?.name).toBe('Unser Haushalt');
+  });
+
+  test('deleteHousehold refuses households that still hold items', async () => {
+    const repo = setup();
+    const h = await repo.createHousehold('Müller');
+    await repo.setActiveHousehold(h.id);
+    const cat = (await repo.listCategories())[0];
+    const comp = await repo.saveCompartment({ freezer_id: 'x', name: 'Fach', sort_order: 0 });
+    await repo.createItem({ ...input, category_id: cat.id, compartment_id: comp.id });
+    // freezer-less compartment keeps this test focused on the items check
+    await expect(repo.deleteHousehold(h.id)).rejects.toThrow('Haushalt kann nicht gelöscht werden: noch Lebensmittel');
+  });
+
+  test('setMemberHousehold changes listProfiles and memberCount', async () => {
+    const repo = setup();
+    const h = await repo.createHousehold('Müller');
+    const me = (await repo.listProfiles())[0];
+    await repo.setMemberHousehold(me.userId, h.id);
+    expect((await repo.listProfiles())[0].householdId).toBe(h.id);
+    expect((await repo.listHouseholds()).find((x) => x.id === h.id)?.memberCount).toBe(1);
+  });
+
+  test('non-admins cannot call admin methods', async () => {
+    const repo = createMemoryRepository({
+      profile: { userId: 'u', email: 'x@y.de', isAdmin: false, household: { id: 'h', name: 'H' }, activeHousehold: null },
+    });
+    await expect(repo.listHouseholds()).rejects.toThrow('Nur für Admins');
+    await expect(repo.setActiveHousehold(null)).rejects.toThrow('Nur für Admins');
+  });
+});

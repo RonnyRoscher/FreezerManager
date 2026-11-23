@@ -23,3 +23,17 @@ export type ItemInput = Omit<Item, 'id' | 'short_code' | 'created_at'>;
 export type ItemView = Item & { category: Category; compartment: Compartment; freezer: Freezer };
 
 export type ExpiryStatus = 'ok' | 'soon' | 'overdue';
+
+export type HouseholdRef = { id: string; name: string };
+
+export type Profile = {
+  userId: string;
+  email: string;
+  isAdmin: boolean;
+  household: HouseholdRef | null;
+  activeHousehold: HouseholdRef | null;
+};
+
+export type HouseholdSummary = HouseholdRef & { memberCount: number };
+
+export type ProfileSummary = { userId: string; email: string; isAdmin: boolean; householdId: string | null };

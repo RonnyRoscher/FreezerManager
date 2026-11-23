@@ -160,5 +160,30 @@ export function createSupabaseRepository(client: SupabaseClient): Repository {
       await ensureUnused('category_id', [id]);
       check(await client.from('categories').delete().eq('id', id));
     },
+    // TODO(Task 5): household operations
+    async getProfile(): Promise<never> {
+      throw new Error('not implemented');
+    },
+    async listHouseholds(): Promise<never> {
+      throw new Error('not implemented');
+    },
+    async createHousehold(): Promise<never> {
+      throw new Error('not implemented');
+    },
+    async renameHousehold(): Promise<never> {
+      throw new Error('not implemented');
+    },
+    async deleteHousehold(): Promise<never> {
+      throw new Error('not implemented');
+    },
+    async listProfiles(): Promise<never> {
+      throw new Error('not implemented');
+    },
+    async setMemberHousehold(): Promise<never> {
+      throw new Error('not implemented');
+    },
+    async setActiveHousehold(): Promise<never> {
+      throw new Error('not implemented');
+    },
   };
 }

@@ -1,5 +1,14 @@
 import { normalizeShortCode } from '../domain/shortCode';
-import type { Category, Compartment, Freezer, Item, ItemView } from '../domain/types';
+import type {
+  Category,
+  Compartment,
+  Freezer,
+  HouseholdRef,
+  Item,
+  ItemView,
+  Profile,
+  ProfileSummary,
+} from '../domain/types';
 import { createWithShortCode } from './createWithShortCode';
 import { DuplicateShortCodeError, InUseError, type Repository, type Session } from './repository';
 
@@ -9,16 +18,91 @@ export type MemorySeed = {
   categories?: Category[];
   items?: Item[];
   session?: Session;
+  profile?: Profile;
+  households?: HouseholdRef[];
+  profiles?: ProfileSummary[];
+};
+
+type Bucket = {
+  freezers: Freezer[];
+  compartments: Compartment[];
+  categories: Category[];
+  items: Item[];
+};
+
+const DEFAULT_CATEGORIES: [string, number][] = [
+  ['Fleisch', 6],
+  ['Geflügel', 6],
+  ['Fisch', 4],
+  ['Gemüse', 12],
+  ['Obst', 12],
+  ['Brot & Backwaren', 3],
+  ['Fertiggerichte', 3],
+  ['Suppen & Soßen', 4],
+  ['Sonstiges', 6],
+];
+
+const OWN_HOUSEHOLD: HouseholdRef = {
+  id: 'household-own',
+  name: 'Unser Haushalt',
 };
 
 const bySortOrder = <T extends { sort_order: number }>(a: T, b: T) => a.sort_order - b.sort_order;
 
 /** In-memory repository used by tests and local experiments. */
 export function createMemoryRepository(seed: MemorySeed = {}): Repository {
-  let freezers = [...(seed.freezers ?? [])];
-  let compartments = [...(seed.compartments ?? [])];
-  let categories = [...(seed.categories ?? [])];
-  let items = [...(seed.items ?? [])];
+  let profile: Profile = seed.profile ?? {
+    userId: 'user-me',
+    email: 'ich@example.de',
+    isAdmin: true,
+    household: OWN_HOUSEHOLD,
+    activeHousehold: OWN_HOUSEHOLD,
+  };
+  let households: HouseholdRef[] = [...(seed.households ?? (profile.household ? [profile.household] : []))];
+  let profiles: ProfileSummary[] = [
+    ...(seed.profiles ?? [
+      {
+        userId: profile.userId,
+        email: profile.email,
+        isAdmin: profile.isAdmin,
+        householdId: profile.household?.id ?? null,
+      },
+    ]),
+  ];
+  // Data is kept per household; the seed belongs to the own household.
+  const buckets = new Map<string, Bucket>();
+  const ownKey = profile.household?.id ?? '';
+  buckets.set(ownKey, {
+    freezers: [...(seed.freezers ?? [])],
+    compartments: [...(seed.compartments ?? [])],
+    categories: [...(seed.categories ?? [])],
+    items: [...(seed.items ?? [])],
+  });
+  const emptyBucket = (): Bucket => ({
+    freezers: [],
+    compartments: [],
+    categories: [],
+    items: [],
+  });
+  const activeKey = () =>
+    (profile.isAdmin ? profile.activeHousehold?.id : undefined) ?? profile.household?.id ?? '';
+  const bucket = (): Bucket => {
+    const key = activeKey();
+    let b = buckets.get(key);
+    if (!b) {
+      b = emptyBucket();
+      buckets.set(key, b);
+    }
+    return b;
+  };
+  const requireAdmin = () => {
+    if (!profile.isAdmin) throw new Error('Nur für Admins');
+  };
+  const cleanName = (name: string) => {
+    const n = name.trim();
+    if (!n) throw new Error('Name darf nicht leer sein');
+    return n;
+  };
   let session: Session = seed.session ?? null;
   const itemListeners = new Set<() => void>();
   const authListeners = new Set<(s: Session) => void>();
@@ -30,6 +114,7 @@ export function createMemoryRepository(seed: MemorySeed = {}): Repository {
   };
 
   function toView(item: Item): ItemView {
+    const { categories, compartments, freezers } = bucket();
     const category = categories.find((c) => c.id === item.category_id)!;
     const compartment = compartments.find((c) => c.id === item.compartment_id)!;
     const freezer = freezers.find((f) => f.id === compartment.freezer_id)!;
@@ -61,51 +146,59 @@ export function createMemoryRepository(seed: MemorySeed = {}): Repository {
     },
 
     async listItems() {
-      return items.map(toView);
+      const b = bucket();
+      return b.items.map(toView);
     },
     async getItem(id) {
-      const item = items.find((i) => i.id === id);
+      const b = bucket();
+      const item = b.items.find((i) => i.id === id);
       return item ? toView(item) : null;
     },
     async findItemByShortCode(code) {
-      const item = items.find((i) => i.short_code === normalizeShortCode(code));
+      const b = bucket();
+      const item = b.items.find((i) => i.short_code === normalizeShortCode(code));
       return item ? toView(item) : null;
     },
     async listItemNames() {
-      return [...new Set(items.map((i) => i.name))].sort((a, b) => a.localeCompare(b, 'de'));
+      const b = bucket();
+      return [...new Set(b.items.map((i) => i.name))].sort((x, y) => x.localeCompare(y, 'de'));
     },
     async createItem(input) {
+      const b = bucket();
       const item = await createWithShortCode(async (short_code) => {
-        if (items.some((i) => i.short_code === short_code)) throw new DuplicateShortCodeError();
+        if (b.items.some((i) => i.short_code === short_code)) throw new DuplicateShortCodeError();
         const created: Item = {
           ...input,
           id: crypto.randomUUID(),
           short_code,
           created_at: new Date().toISOString(),
         };
-        items = [...items, created];
+        b.items = [...b.items, created];
         return created;
       });
       notifyItems();
       return item;
     },
     async updateItem(id, input) {
-      const existing = items.find((i) => i.id === id);
+      const b = bucket();
+      const existing = b.items.find((i) => i.id === id);
       if (!existing) throw new Error('Item not found');
       const updated = { ...existing, ...input };
-      items = upsert(items, updated);
+      b.items = upsert(b.items, updated);
       notifyItems();
       return updated;
     },
     async removeItem(id) {
-      const existing = items.find((i) => i.id === id);
+      const b = bucket();
+      const existing = b.items.find((i) => i.id === id);
       if (!existing) return null;
-      items = items.filter((i) => i.id !== id);
+      b.items = b.items.filter((i) => i.id !== id);
       notifyItems();
       return existing;
     },
     async restoreItem(item) {
-      items = upsert(items, item);
+      const b = bucket();
+      b.items = upsert(b.items, item);
       notifyItems();
     },
     subscribeItems(onChange) {
@@ -114,45 +207,131 @@ export function createMemoryRepository(seed: MemorySeed = {}): Repository {
     },
 
     async listFreezers() {
-      return [...freezers].sort(bySortOrder).map((f) => ({
+      const b = bucket();
+      return [...b.freezers].sort(bySortOrder).map((f) => ({
         ...f,
-        compartments: compartments.filter((c) => c.freezer_id === f.id).sort(bySortOrder),
+        compartments: b.compartments.filter((c) => c.freezer_id === f.id).sort(bySortOrder),
       }));
     },
     async saveFreezer(draft) {
-      const freezer: Freezer = { ...draft, id: draft.id ?? crypto.randomUUID() };
-      freezers = upsert(freezers, freezer);
+      const b = bucket();
+      const freezer: Freezer = {
+        ...draft,
+        id: draft.id ?? crypto.randomUUID(),
+      };
+      b.freezers = upsert(b.freezers, freezer);
       return freezer;
     },
     async deleteFreezer(id) {
-      const ids = compartments.filter((c) => c.freezer_id === id).map((c) => c.id);
-      const count = items.filter((i) => ids.includes(i.compartment_id)).length;
+      const b = bucket();
+      const ids = b.compartments.filter((c) => c.freezer_id === id).map((c) => c.id);
+      const count = b.items.filter((i) => ids.includes(i.compartment_id)).length;
       if (count > 0) throw new InUseError(count);
-      compartments = compartments.filter((c) => c.freezer_id !== id);
-      freezers = freezers.filter((f) => f.id !== id);
+      b.compartments = b.compartments.filter((c) => c.freezer_id !== id);
+      b.freezers = b.freezers.filter((f) => f.id !== id);
     },
     async saveCompartment(draft) {
-      const compartment: Compartment = { ...draft, id: draft.id ?? crypto.randomUUID() };
-      compartments = upsert(compartments, compartment);
+      const b = bucket();
+      const compartment: Compartment = {
+        ...draft,
+        id: draft.id ?? crypto.randomUUID(),
+      };
+      b.compartments = upsert(b.compartments, compartment);
       return compartment;
     },
     async deleteCompartment(id) {
-      const count = items.filter((i) => i.compartment_id === id).length;
+      const b = bucket();
+      const count = b.items.filter((i) => i.compartment_id === id).length;
       if (count > 0) throw new InUseError(count);
-      compartments = compartments.filter((c) => c.id !== id);
+      b.compartments = b.compartments.filter((c) => c.id !== id);
     },
     async listCategories() {
-      return [...categories].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+      const b = bucket();
+      return [...b.categories].sort((x, y) => x.name.localeCompare(y.name, 'de'));
     },
     async saveCategory(draft) {
-      const category: Category = { ...draft, id: draft.id ?? crypto.randomUUID() };
-      categories = upsert(categories, category);
+      const b = bucket();
+      const category: Category = {
+        ...draft,
+        id: draft.id ?? crypto.randomUUID(),
+      };
+      b.categories = upsert(b.categories, category);
       return category;
     },
     async deleteCategory(id) {
-      const count = items.filter((i) => i.category_id === id).length;
+      const b = bucket();
+      const count = b.items.filter((i) => i.category_id === id).length;
       if (count > 0) throw new InUseError(count);
-      categories = categories.filter((c) => c.id !== id);
+      b.categories = b.categories.filter((c) => c.id !== id);
+    },
+
+    async getProfile() {
+      return profile;
+    },
+    async listHouseholds() {
+      requireAdmin();
+      return households.map((h) => ({
+        ...h,
+        memberCount: profiles.filter((p) => p.householdId === h.id).length,
+      }));
+    },
+    async createHousehold(name) {
+      requireAdmin();
+      const household = { id: crypto.randomUUID(), name: cleanName(name) };
+      households = [...households, household];
+      buckets.set(household.id, {
+        ...emptyBucket(),
+        categories: DEFAULT_CATEGORIES.map(([n, max_months]) => ({
+          id: crypto.randomUUID(),
+          name: n,
+          max_months,
+        })),
+      });
+      return household;
+    },
+    async renameHousehold(id, name) {
+      requireAdmin();
+      const n = cleanName(name);
+      households = households.map((h) => (h.id === id ? { ...h, name: n } : h));
+      const rename = (h: HouseholdRef | null) => (h && h.id === id ? { ...h, name: n } : h);
+      profile = {
+        ...profile,
+        household: rename(profile.household),
+        activeHousehold: rename(profile.activeHousehold),
+      };
+    },
+    async deleteHousehold(id) {
+      requireAdmin();
+      if (profiles.some((p) => p.householdId === id)) {
+        throw new Error('Haushalt kann nicht gelöscht werden: noch Mitglieder');
+      }
+      const b = buckets.get(id);
+      if (b && b.freezers.length > 0)
+        throw new Error('Haushalt kann nicht gelöscht werden: noch Gefriergeräte');
+      if (b && b.items.length > 0) throw new Error('Haushalt kann nicht gelöscht werden: noch Lebensmittel');
+      buckets.delete(id);
+      households = households.filter((h) => h.id !== id);
+      if (profile.activeHousehold?.id === id) profile = { ...profile, activeHousehold: profile.household };
+    },
+    async listProfiles() {
+      requireAdmin();
+      return profiles;
+    },
+    async setMemberHousehold(userId, householdId) {
+      requireAdmin();
+      profiles = profiles.map((p) => (p.userId === userId ? { ...p, householdId } : p));
+      if (userId === profile.userId) {
+        const household = households.find((h) => h.id === householdId) ?? null;
+        profile = { ...profile, household, activeHousehold: household };
+      }
+      notifyItems();
+    },
+    async setActiveHousehold(householdId) {
+      requireAdmin();
+      const target =
+        householdId === null ? profile.household : (households.find((h) => h.id === householdId) ?? null);
+      profile = { ...profile, activeHousehold: target };
+      notifyItems();
     },
   };
 }
