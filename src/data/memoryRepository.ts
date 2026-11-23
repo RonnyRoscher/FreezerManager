@@ -58,6 +58,12 @@ export function createMemoryRepository(seed: MemorySeed = {}): Repository {
     household: OWN_HOUSEHOLD,
     activeHousehold: OWN_HOUSEHOLD,
   };
+  // null = the admin works in the own household (mirrors profiles.active_household_id).
+  let active: HouseholdRef | null =
+    profile.activeHousehold && profile.activeHousehold.id !== profile.household?.id
+      ? profile.activeHousehold
+      : null;
+  const currentProfile = (): Profile => ({ ...profile, activeHousehold: active ?? profile.household });
   let households: HouseholdRef[] = [...(seed.households ?? (profile.household ? [profile.household] : []))];
   let profiles: ProfileSummary[] = [
     ...(seed.profiles ?? [
@@ -84,8 +90,7 @@ export function createMemoryRepository(seed: MemorySeed = {}): Repository {
     categories: [],
     items: [],
   });
-  const activeKey = () =>
-    (profile.isAdmin ? profile.activeHousehold?.id : undefined) ?? profile.household?.id ?? '';
+  const activeKey = () => (profile.isAdmin ? active?.id : undefined) ?? profile.household?.id ?? '';
   const bucket = (): Bucket => {
     const key = activeKey();
     let b = buckets.get(key);
@@ -266,7 +271,7 @@ export function createMemoryRepository(seed: MemorySeed = {}): Repository {
     },
 
     async getProfile() {
-      return profile;
+      return currentProfile();
     },
     async listHouseholds() {
       requireAdmin();
@@ -293,11 +298,11 @@ export function createMemoryRepository(seed: MemorySeed = {}): Repository {
       requireAdmin();
       const n = cleanName(name);
       households = households.map((h) => (h.id === id ? { ...h, name: n } : h));
+      if (active?.id === id) active = { ...active, name: n };
       const rename = (h: HouseholdRef | null) => (h && h.id === id ? { ...h, name: n } : h);
       profile = {
         ...profile,
         household: rename(profile.household),
-        activeHousehold: rename(profile.activeHousehold),
       };
     },
     async deleteHousehold(id) {
@@ -311,7 +316,7 @@ export function createMemoryRepository(seed: MemorySeed = {}): Repository {
       if (b && b.items.length > 0) throw new Error('Haushalt kann nicht gelöscht werden: noch Lebensmittel');
       buckets.delete(id);
       households = households.filter((h) => h.id !== id);
-      if (profile.activeHousehold?.id === id) profile = { ...profile, activeHousehold: profile.household };
+      if (active?.id === id) active = null;
     },
     async listProfiles() {
       requireAdmin();
@@ -322,7 +327,7 @@ export function createMemoryRepository(seed: MemorySeed = {}): Repository {
       profiles = profiles.map((p) => (p.userId === userId ? { ...p, householdId } : p));
       if (userId === profile.userId) {
         const household = households.find((h) => h.id === householdId) ?? null;
-        profile = { ...profile, household, activeHousehold: household };
+        profile = { ...profile, household };
       }
       notifyItems();
     },
@@ -330,7 +335,7 @@ export function createMemoryRepository(seed: MemorySeed = {}): Repository {
       requireAdmin();
       const target =
         householdId === null ? profile.household : (households.find((h) => h.id === householdId) ?? null);
-      profile = { ...profile, activeHousehold: target };
+      active = target && target.id !== profile.household?.id ? target : null;
       notifyItems();
     },
   };

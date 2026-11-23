@@ -189,6 +189,30 @@ describe('households', () => {
     expect((await repo.listHouseholds()).find((x) => x.id === h.id)?.memberCount).toBe(1);
   });
 
+  test('setMemberHousehold on self keeps an open foreign household active', async () => {
+    const repo = setup();
+    const x = await repo.createHousehold('X');
+    const y = await repo.createHousehold('Y');
+    const me = (await repo.listProfiles())[0];
+    await repo.setActiveHousehold(x.id);
+    await repo.setMemberHousehold(me.userId, y.id);
+    const profile = await repo.getProfile();
+    expect(profile?.household).toEqual(y);
+    expect(profile?.activeHousehold).toEqual(x);
+    expect(await repo.listFreezers()).toEqual([]);
+    await repo.setActiveHousehold(null);
+    expect((await repo.getProfile())?.activeHousehold).toEqual(y);
+  });
+
+  test('setMemberHousehold on self moves the active household along when none is open', async () => {
+    const repo = setup();
+    const y = await repo.createHousehold('Y');
+    const me = (await repo.listProfiles())[0];
+    await repo.setMemberHousehold(me.userId, y.id);
+    expect((await repo.getProfile())?.activeHousehold).toEqual(y);
+    expect(await repo.listFreezers()).toEqual([]);
+  });
+
   test('non-admins cannot call admin methods', async () => {
     const repo = createMemoryRepository({
       profile: { userId: 'u', email: 'x@y.de', isAdmin: false, household: { id: 'h', name: 'H' }, activeHousehold: null },
