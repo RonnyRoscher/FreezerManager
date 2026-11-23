@@ -1,7 +1,7 @@
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import { appBaseUrl } from '../domain/qrUrl';
 import { normalizeShortCode } from '../domain/shortCode';
-import type { Category, Compartment, Freezer, Item, ItemView } from '../domain/types';
+import type { Category, Compartment, Freezer, HouseholdRef, Item, ItemView } from '../domain/types';
 import { createWithShortCode } from './createWithShortCode';
 import { DuplicateShortCodeError, InUseError, type Repository, type Session } from './repository';
 
@@ -10,6 +10,14 @@ const ITEM_SELECT = '*, category:categories(*), compartment:compartments(*, free
 type ItemRow = Item & {
   category: Category;
   compartment: Compartment & { freezer: Freezer };
+};
+
+type ProfileRow = {
+  user_id: string;
+  email: string;
+  household_id: string | null;
+  active_household_id: string | null;
+  is_admin: boolean;
 };
 
 export function rowToItemView(row: ItemRow): ItemView {
@@ -46,6 +54,13 @@ export function createSupabaseRepository(client: SupabaseClient): Repository {
   async function ensureUnused(column: 'category_id' | 'compartment_id', ids: string[]) {
     const count = await countItems(column, ids);
     if (count > 0) throw new InUseError(count);
+  }
+
+  /** Calls a database function; its error messages are user-facing and passed on verbatim. */
+  async function rpc<T = null>(fn: string, args: Record<string, unknown>): Promise<T> {
+    const { data, error } = await client.rpc(fn, args);
+    if (error) throw new Error(error.message);
+    return data as T;
   }
 
   return {
@@ -160,30 +175,70 @@ export function createSupabaseRepository(client: SupabaseClient): Repository {
       await ensureUnused('category_id', [id]);
       check(await client.from('categories').delete().eq('id', id));
     },
-    // TODO(Task 5): household operations
-    async getProfile(): Promise<never> {
-      throw new Error('not implemented');
+    async getProfile() {
+      const { data: userData } = await client.auth.getUser();
+      const user = userData.user;
+      if (!user) return null;
+      const row = check(
+        await client
+          .from('profiles')
+          .select('user_id, email, household_id, active_household_id, is_admin')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+      ) as ProfileRow | null;
+      if (!row) return null;
+      // Mirrors public.current_household(): only admins can act in another household.
+      const activeId = row.is_admin && row.active_household_id ? row.active_household_id : row.household_id;
+      const ids = [...new Set([row.household_id, activeId].filter((id): id is string => !!id))];
+      const rows = ids.length
+        ? (check(await client.from('households').select('id, name').in('id', ids)) as HouseholdRef[])
+        : [];
+      const find = (id: string | null) => rows.find((h) => h.id === id) ?? null;
+      return {
+        userId: row.user_id,
+        email: row.email,
+        isAdmin: row.is_admin,
+        household: find(row.household_id),
+        activeHousehold: find(activeId),
+      };
     },
-    async listHouseholds(): Promise<never> {
-      throw new Error('not implemented');
+    async listHouseholds() {
+      const households = check(
+        await client.from('households').select('id, name').order('name'),
+      ) as HouseholdRef[];
+      const members = check(await client.from('profiles').select('household_id')) as {
+        household_id: string | null;
+      }[];
+      return households.map((h) => ({
+        ...h,
+        memberCount: members.filter((m) => m.household_id === h.id).length,
+      }));
     },
-    async createHousehold(): Promise<never> {
-      throw new Error('not implemented');
+    async createHousehold(name) {
+      return rpc<HouseholdRef>('create_household', { name });
     },
-    async renameHousehold(): Promise<never> {
-      throw new Error('not implemented');
+    async renameHousehold(id, name) {
+      await rpc('rename_household', { id, name });
     },
-    async deleteHousehold(): Promise<never> {
-      throw new Error('not implemented');
+    async deleteHousehold(id) {
+      await rpc('delete_household', { id });
     },
-    async listProfiles(): Promise<never> {
-      throw new Error('not implemented');
+    async listProfiles() {
+      const rows = check(
+        await client.from('profiles').select('user_id, email, household_id, is_admin').order('email'),
+      ) as ProfileRow[];
+      return rows.map((r) => ({
+        userId: r.user_id,
+        email: r.email,
+        isAdmin: r.is_admin,
+        householdId: r.household_id,
+      }));
     },
-    async setMemberHousehold(): Promise<never> {
-      throw new Error('not implemented');
+    async setMemberHousehold(userId, householdId) {
+      await rpc('set_member_household', { user_id: userId, household_id: householdId });
     },
-    async setActiveHousehold(): Promise<never> {
-      throw new Error('not implemented');
+    async setActiveHousehold(householdId) {
+      await rpc('set_active_household', { household_id: householdId });
     },
   };
 }
