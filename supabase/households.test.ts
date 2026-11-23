@@ -245,3 +245,293 @@ describe('current_household()', () => {
     expect(await q(null)).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Access rules and admin functions
+// ---------------------------------------------------------------------------
+
+const DEFAULT_CATEGORIES = [
+  { name: 'Fleisch', max_months: 6 },
+  { name: 'Geflügel', max_months: 6 },
+  { name: 'Fisch', max_months: 4 },
+  { name: 'Gemüse', max_months: 12 },
+  { name: 'Obst', max_months: 12 },
+  { name: 'Brot & Backwaren', max_months: 3 },
+  { name: 'Fertiggerichte', max_months: 3 },
+  { name: 'Suppen & Soßen', max_months: 4 },
+  { name: 'Sonstiges', max_months: 6 },
+];
+
+const byName = <T extends { name: string }>(rows: T[]) => [...rows].sort((x, y) => x.name.localeCompare(y.name));
+
+/** Row counts of the four data tables for one household (as superuser). */
+async function snapshot(db: Db, household: string) {
+  const out: Record<string, number> = {};
+  for (const t of TABLES) {
+    const r = await db.query<{ n: number }>(`select count(*)::int as n from ${t} where household_id = $1`, [household]);
+    out[t] = r.rows[0].n;
+  }
+  return out;
+}
+
+/** Distinct household ids of all rows the user can see in the four data tables, and the row count. */
+async function visible(db: Db, uid: string | null) {
+  return asUser(db, uid, async (tx) => {
+    const r = await tx.query<{ household_id: string }>(
+      TABLES.map((t) => `select household_id from ${t}`).join(' union all '),
+    );
+    return { households: [...new Set(r.rows.map((x) => x.household_id))], rows: r.rows.length };
+  });
+}
+
+/**
+ * A ("Unser Haushalt", legacy data) with member a and the admin; B created by the admin via
+ * create_household, member b with a freezer, compartment and item in B; an account without household.
+ */
+async function householdsDb() {
+  const { db, userA: a, userB: admin } = await seededLegacyDb();
+  await applyMigration(db, '0002');
+  await db.query('update profiles set is_admin = true where user_id = $1', [admin]);
+  const A = (await db.query<{ id: string }>("select id from households where name = 'Unser Haushalt'")).rows[0].id;
+  const B = await asUser(db, admin, async (tx) =>
+    (await tx.query<{ id: string }>("select id from create_household('Zweiter Haushalt')")).rows[0].id,
+  );
+  const b = await addUser(db, 'member-b@example.com');
+  await db.query('update profiles set household_id = $1 where user_id = $2', [B, b]);
+  const none = await addUser(db, 'none@example.com');
+  await asUser(db, b, async (tx) => {
+    const f = (await tx.query<{ id: string }>("insert into freezers (name) values ('B-Truhe') returning id")).rows[0].id;
+    const c = (await tx.query<{ id: string }>(
+      "insert into compartments (freezer_id, name) values ($1, 'B-Fach') returning id",
+      [f],
+    )).rows[0].id;
+    const cat = (await tx.query<{ id: string }>("select id from categories where name = 'Fisch'")).rows[0].id;
+    await tx.query(
+      "insert into items (short_code, name, category_id, compartment_id, frozen_at) values ('B1', 'Forelle', $1, $2, '2026-11-01')",
+      [cat, c],
+    );
+  });
+  const freezerA = (await db.query<{ id: string }>("select id from freezers where name = 'Keller'")).rows[0].id;
+  return { db, a, b, admin, none, A, B, freezerA };
+}
+
+describe('0002 row-level security', () => {
+  it('members see only their own household and cannot touch another one', async () => {
+    const { db, a, b, A, B, freezerA } = await householdsDb();
+    expect(await visible(db, a)).toEqual({ households: [A], rows: 1 + 2 + 10 + 3 });
+    expect(await visible(db, b)).toEqual({ households: [B], rows: 1 + 1 + 9 + 1 });
+    const beforeA = await snapshot(db, A);
+
+    const upd = await asUser(db, b, (tx) => tx.query("update freezers set name = 'Gekapert' where id = $1", [freezerA]));
+    expect(upd.affectedRows).toBe(0);
+    const del = await asUser(db, b, (tx) => tx.query('delete from freezers where id = $1', [freezerA]));
+    expect(del.affectedRows).toBe(0);
+    await expect(
+      asUser(db, b, (tx) => tx.query("insert into compartments (freezer_id, name) values ($1, 'Fremd')", [freezerA])),
+    ).rejects.toThrow();
+
+    expect(await snapshot(db, A)).toEqual(beforeA);
+    expect((await db.query('select name from freezers where id = $1', [freezerA])).rows).toEqual([{ name: 'Keller' }]);
+  });
+
+  it('members cannot move their rows into another household or insert into one', async () => {
+    const { db, a, A, B, freezerA } = await householdsDb();
+    const beforeA = await snapshot(db, A);
+    const beforeB = await snapshot(db, B);
+
+    const tryUpdate = (sql: string, params: unknown[]) =>
+      asUser(db, a, (tx) => tx.query(sql, params)).then(
+        (r) => r.affectedRows,
+        () => 'error',
+      );
+    expect(await tryUpdate('update freezers set household_id = $1 where id = $2', [B, freezerA])).not.toBe(1);
+    expect(await tryUpdate("update categories set household_id = $1 where name = 'Eis'", [B])).not.toBe(1);
+    await expect(
+      asUser(db, a, (tx) => tx.query("insert into freezers (name, household_id) values ('Fremd', $1)", [B])),
+    ).rejects.toThrow();
+    await expect(
+      asUser(db, a, (tx) => tx.query("insert into categories (name, max_months, household_id) values ('Fremd', 1, $1)", [B])),
+    ).rejects.toThrow();
+
+    expect((await db.query('select household_id from freezers where id = $1', [freezerA])).rows).toEqual([{ household_id: A }]);
+    expect(await snapshot(db, A)).toEqual(beforeA);
+    expect(await snapshot(db, B)).toEqual(beforeB);
+  });
+
+  it('gives a new household exactly the 9 default categories', async () => {
+    const { db, B } = await householdsDb();
+    const r = await db.query<{ name: string; max_months: number }>(
+      'select name, max_months from categories where household_id = $1',
+      [B],
+    );
+    expect(byName(r.rows)).toEqual(byName(DEFAULT_CATEGORIES));
+  });
+
+  it('shows an account without household no data', async () => {
+    const { db, none } = await householdsDb();
+    expect(await visible(db, none)).toEqual({ households: [], rows: 0 });
+    expect(await visible(db, null)).toEqual({ households: [], rows: 0 });
+  });
+
+  it('keeps the old app working: rows inserted without household_id land in A', async () => {
+    const { db, a, A } = await householdsDb();
+    const got = await asUser(db, a, async (tx) => {
+      const f = (await tx.query<{ id: string }>("insert into freezers (name) values ('Garage') returning id")).rows[0].id;
+      const c = (await tx.query<{ id: string }>(
+        "insert into compartments (freezer_id, name) values ($1, 'Oben') returning id",
+        [f],
+      )).rows[0].id;
+      const cat = (await tx.query<{ id: string }>("select id from categories where name = 'Obst'")).rows[0].id;
+      await tx.query(
+        "insert into items (short_code, name, category_id, compartment_id, frozen_at) values ('G1', 'Kirschen', $1, $2, '2026-11-01')",
+        [cat, c],
+      );
+      return { f, c };
+    });
+    const r = await db.query<{ household_id: string }>(
+      `select household_id from freezers where id = $1
+       union all select household_id from compartments where id = $2
+       union all select household_id from items where short_code = 'G1'`,
+      [got.f, got.c],
+    );
+    expect(r.rows).toEqual([{ household_id: A }, { household_id: A }, { household_id: A }]);
+  });
+
+  it('lets members read only their own profile and household; admins read all', async () => {
+    const { db, a, admin, A } = await householdsDb();
+    const as = (uid: string | null, sql: string) => asUser(db, uid, async (tx) => (await tx.query(sql)).rows);
+    expect(await as(a, 'select user_id from profiles')).toEqual([{ user_id: a }]);
+    expect(await as(a, 'select id from households')).toEqual([{ id: A }]);
+    expect(await as(admin, 'select user_id from profiles')).toHaveLength(4);
+    expect(await as(admin, 'select id from households')).toHaveLength(2);
+    expect(await as(null, 'select user_id from profiles')).toEqual([]);
+    expect(await as(null, 'select id from households')).toEqual([]);
+  });
+});
+
+describe('0002 admin functions', () => {
+  it('lets the admin switch to another household and back without changing his own', async () => {
+    const { db, admin, A, B } = await householdsDb();
+    const beforeA = await snapshot(db, A);
+    expect((await visible(db, admin)).households).toEqual([A]);
+
+    await asUser(db, admin, (tx) => tx.query('select set_active_household($1)', [B]));
+    expect((await visible(db, admin)).households).toEqual([B]);
+    await asUser(db, admin, async (tx) => {
+      const f = (await tx.query<{ id: string }>("insert into freezers (name) values ('Admin-Truhe') returning id")).rows[0].id;
+      const c = (await tx.query<{ id: string }>(
+        "insert into compartments (freezer_id, name) values ($1, 'Unten') returning id",
+        [f],
+      )).rows[0].id;
+      const cat = (await tx.query<{ id: string }>("select id from categories where name = 'Gemüse'")).rows[0].id;
+      await tx.query(
+        "insert into items (short_code, name, category_id, compartment_id, frozen_at) values ('X9', 'Erbsen', $1, $2, '2026-11-02')",
+        [cat, c],
+      );
+    });
+    const r = await db.query<{ household_id: string }>(
+      "select household_id from freezers where name = 'Admin-Truhe' union all select household_id from items where short_code = 'X9'",
+    );
+    expect(r.rows).toEqual([{ household_id: B }, { household_id: B }]);
+
+    await asUser(db, admin, (tx) => tx.query('select set_active_household(null)'));
+    expect((await visible(db, admin)).households).toEqual([A]);
+    expect(await snapshot(db, A)).toEqual(beforeA);
+    const p = await db.query('select household_id, active_household_id from profiles where user_id = $1', [admin]);
+    expect(p.rows).toEqual([{ household_id: A, active_household_id: null }]);
+  });
+
+  it('set_member_household moves the account, never the data', async () => {
+    const { db, a, admin, A, B } = await householdsDb();
+    const beforeA = await snapshot(db, A);
+    const beforeB = await snapshot(db, B);
+    await asUser(db, admin, (tx) => tx.query('select set_member_household($1, $2)', [a, B]));
+    expect((await visible(db, a)).households).toEqual([B]);
+    expect(await snapshot(db, A)).toEqual(beforeA);
+    expect(await snapshot(db, B)).toEqual(beforeB);
+
+    await asUser(db, admin, (tx) => tx.query('select set_member_household($1, null)', [a]));
+    expect(await visible(db, a)).toEqual({ households: [], rows: 0 });
+  });
+
+  it('rename_household renames', async () => {
+    const { db, admin, B } = await householdsDb();
+    await asUser(db, admin, (tx) => tx.query("select rename_household($1, 'Ferienhaus')", [B]));
+    expect((await db.query('select name from households where id = $1', [B])).rows).toEqual([{ name: 'Ferienhaus' }]);
+  });
+
+  it('refuses admin functions to non-admins and does not let them edit profiles', async () => {
+    const { db, a, b, A, B } = await householdsDb();
+    const calls: [string, unknown[]][] = [
+      ["select create_household('Meins')", []],
+      ['select rename_household($1, $2)', [A, 'Meins']],
+      ['select delete_household($1)', [B]],
+      ['select set_member_household($1, $2)', [a, B]],
+      ['select set_active_household($1)', [B]],
+    ];
+    for (const [sql, params] of calls) {
+      await expect(asUser(db, a, (tx) => tx.query(sql, params))).rejects.toThrow('Nur für Admins');
+    }
+    const tryWrite = (sql: string, params: unknown[] = []) =>
+      asUser(db, a, (tx) => tx.query(sql, params)).then(
+        (r) => r.affectedRows,
+        () => 'error',
+      );
+    expect(await tryWrite('update profiles set is_admin = true')).not.toBe(1);
+    expect(await tryWrite('update profiles set household_id = $1', [B])).not.toBe(1);
+    expect(await tryWrite('update profiles set active_household_id = $1', [B])).not.toBe(1);
+    expect(await tryWrite('delete from profiles')).not.toBe(1);
+    expect(await tryWrite("insert into households (name) values ('Meins')")).not.toBe(1);
+    expect(await tryWrite("update households set name = 'Meins'")).not.toBe(1);
+    expect(await tryWrite('delete from households where id = $1', [B])).not.toBe(1);
+
+    const p = await db.query('select household_id, active_household_id, is_admin from profiles where user_id = $1', [a]);
+    expect(p.rows).toEqual([{ household_id: A, active_household_id: null, is_admin: false }]);
+    expect(await count(db, 'households')).toBe(2);
+    expect((await db.query('select name from households where id = $1', [A])).rows).toEqual([{ name: 'Unser Haushalt' }]);
+    expect(await visible(db, b)).toMatchObject({ households: [B] });
+  });
+
+  it('delete_household refuses households with members or freezers and deletes empty ones with their categories', async () => {
+    const { db, admin, A } = await householdsDb();
+    await expect(asUser(db, admin, (tx) => tx.query('select delete_household($1)', [A]))).rejects.toThrow(
+      'Haushalt kann nicht gelöscht werden: noch Mitglieder',
+    );
+    const C = await asUser(db, admin, async (tx) =>
+      (await tx.query<{ id: string }>("select id from create_household('Dritter')")).rows[0].id,
+    );
+    const f = (await db.query<{ id: string }>("insert into freezers (name, household_id) values ('C-Truhe', $1) returning id", [C]))
+      .rows[0].id;
+    await expect(asUser(db, admin, (tx) => tx.query('select delete_household($1)', [C]))).rejects.toThrow(
+      'Haushalt kann nicht gelöscht werden: noch Gefriergeräte',
+    );
+    await db.query('delete from freezers where id = $1', [f]);
+    expect(await count(db, 'categories')).toBe(10 + 9 + 9);
+
+    await asUser(db, admin, (tx) => tx.query('select delete_household($1)', [C]));
+    expect((await db.query('select id from households where id = $1', [C])).rows).toEqual([]);
+    expect(await count(db, 'categories')).toBe(10 + 9);
+  });
+
+  it('resets the active household when the household the admin has open is deleted', async () => {
+    const { db, admin, A } = await householdsDb();
+    const C = await asUser(db, admin, async (tx) => {
+      const id = (await tx.query<{ id: string }>("select id from create_household('Dritter')")).rows[0].id;
+      await tx.query('select set_active_household($1)', [id]);
+      return id;
+    });
+    await asUser(db, admin, (tx) => tx.query('select delete_household($1)', [C]));
+    const p = await db.query('select active_household_id from profiles where user_id = $1', [admin]);
+    expect(p.rows).toEqual([{ active_household_id: null }]);
+    const cur = await asUser(db, admin, async (tx) => (await tx.query<{ h: string }>('select current_household() as h')).rows[0].h);
+    expect(cur).toBe(A);
+  });
+
+  it('deleting an account keeps the household data', async () => {
+    const { db, a, A } = await householdsDb();
+    const beforeA = await snapshot(db, A);
+    await db.query('delete from auth.users where id = $1', [a]);
+    expect((await db.query('select 1 from profiles where user_id = $1', [a])).rows).toEqual([]);
+    expect(await snapshot(db, A)).toEqual(beforeA);
+  });
+});

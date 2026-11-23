@@ -196,4 +196,197 @@ revoke execute on function public.assign_household_from_user() from public, anon
 revoke execute on function public.assign_compartment_household() from public, anon, authenticated;
 revoke execute on function public.assign_item_household() from public, anon, authenticated;
 
+-- ---------------------------------------------------------------------------
+-- Admin check
+-- ---------------------------------------------------------------------------
+
+create function public.is_admin() returns boolean
+  language sql
+  stable
+  security definer
+  set search_path = ''
+as $$
+  select coalesce((select p.is_admin from public.profiles p where p.user_id = auth.uid()), false)
+$$;
+
+create function public.assert_admin() returns void
+  language plpgsql
+  stable
+  security definer
+  set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Nur für Admins';
+  end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Access rules (only now, after the takeover above)
+-- ---------------------------------------------------------------------------
+
+drop policy "authenticated full access" on public.freezers;
+drop policy "authenticated full access" on public.compartments;
+drop policy "authenticated full access" on public.categories;
+drop policy "authenticated full access" on public.items;
+
+-- using: which rows can be read, updated, deleted; with check: what a new or changed row
+-- may look like. Both on the current household, so no row can be written into or moved
+-- to another household. (select ...) is evaluated once per statement.
+create policy "own household" on public.freezers
+  for all to authenticated
+  using (household_id = (select public.current_household()))
+  with check (household_id = (select public.current_household()));
+create policy "own household" on public.compartments
+  for all to authenticated
+  using (household_id = (select public.current_household()))
+  with check (household_id = (select public.current_household()));
+create policy "own household" on public.categories
+  for all to authenticated
+  using (household_id = (select public.current_household()))
+  with check (household_id = (select public.current_household()));
+create policy "own household" on public.items
+  for all to authenticated
+  using (household_id = (select public.current_household()))
+  with check (household_id = (select public.current_household()));
+
+-- households, profiles: read only; all changes go through the functions below.
+create policy "own household or admin" on public.households
+  for select to authenticated
+  using (id = (select public.current_household()) or (select public.is_admin()));
+create policy "own profile or admin" on public.profiles
+  for select to authenticated
+  using (user_id = (select auth.uid()) or (select public.is_admin()));
+
+revoke insert, update, delete, truncate on public.households from anon, authenticated;
+revoke insert, update, delete, truncate on public.profiles from anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Admin functions (RPC)
+-- ---------------------------------------------------------------------------
+-- security definer: they write tables nobody may write directly; each checks is_admin.
+
+create function public.create_household(name text) returns public.households
+  language plpgsql
+  security definer
+  set search_path = ''
+as $$
+declare
+  result public.households;
+begin
+  perform public.assert_admin();
+  if nullif(btrim(create_household.name), '') is null then
+    raise exception 'Name darf nicht leer sein';
+  end if;
+  insert into public.households (name) values (btrim(create_household.name))
+    returning * into result;
+  insert into public.categories (name, max_months, household_id) values
+    ('Fleisch', 6, result.id),
+    ('Geflügel', 6, result.id),
+    ('Fisch', 4, result.id),
+    ('Gemüse', 12, result.id),
+    ('Obst', 12, result.id),
+    ('Brot & Backwaren', 3, result.id),
+    ('Fertiggerichte', 3, result.id),
+    ('Suppen & Soßen', 4, result.id),
+    ('Sonstiges', 6, result.id);
+  return result;
+end;
+$$;
+
+create function public.rename_household(id uuid, name text) returns void
+  language plpgsql
+  security definer
+  set search_path = ''
+as $$
+begin
+  perform public.assert_admin();
+  if nullif(btrim(rename_household.name), '') is null then
+    raise exception 'Name darf nicht leer sein';
+  end if;
+  update public.households h set name = btrim(rename_household.name)
+    where h.id = rename_household.id;
+  if not found then
+    raise exception 'Haushalt nicht gefunden';
+  end if;
+end;
+$$;
+
+-- Only empty households: no members, no freezers, no items. Their categories go with them.
+create function public.delete_household(id uuid) returns void
+  language plpgsql
+  security definer
+  set search_path = ''
+as $$
+begin
+  perform public.assert_admin();
+  perform 1 from public.households h where h.id = delete_household.id for update;
+  if not found then
+    raise exception 'Haushalt nicht gefunden';
+  end if;
+  if exists (select 1 from public.profiles p where p.household_id = delete_household.id) then
+    raise exception 'Haushalt kann nicht gelöscht werden: noch Mitglieder';
+  end if;
+  if exists (select 1 from public.freezers f where f.household_id = delete_household.id) then
+    raise exception 'Haushalt kann nicht gelöscht werden: noch Gefriergeräte';
+  end if;
+  if exists (select 1 from public.items i where i.household_id = delete_household.id) then
+    raise exception 'Haushalt kann nicht gelöscht werden: noch Lebensmittel';
+  end if;
+  delete from public.categories c where c.household_id = delete_household.id;
+  -- Profiles that have it open as active household fall back via on delete set null.
+  delete from public.households h where h.id = delete_household.id;
+end;
+$$;
+
+-- Assigns an account to a household (null: none). Never moves or deletes data.
+create function public.set_member_household(user_id uuid, household_id uuid) returns void
+  language plpgsql
+  security definer
+  set search_path = ''
+as $$
+begin
+  perform public.assert_admin();
+  update public.profiles p set household_id = set_member_household.household_id
+    where p.user_id = set_member_household.user_id;
+  if not found then
+    raise exception 'Konto nicht gefunden';
+  end if;
+end;
+$$;
+
+-- The household the calling admin looks at; null: back to his own.
+create function public.set_active_household(household_id uuid) returns void
+  language plpgsql
+  security definer
+  set search_path = ''
+as $$
+begin
+  perform public.assert_admin();
+  update public.profiles p set active_household_id = set_active_household.household_id
+    where p.user_id = auth.uid();
+end;
+$$;
+
+-- Functions are executable by public by default; open them only to signed-in users.
+revoke execute on function public.current_household() from public;
+revoke execute on function public.is_admin() from public, anon;
+revoke execute on function public.assert_admin() from public, anon, authenticated;
+revoke execute on function public.create_household(text) from public, anon;
+revoke execute on function public.rename_household(uuid, text) from public, anon;
+revoke execute on function public.delete_household(uuid) from public, anon;
+revoke execute on function public.set_member_household(uuid, uuid) from public, anon;
+revoke execute on function public.set_active_household(uuid) from public, anon;
+
+-- Used inside the policies above, which run as the caller. current_household() also for
+-- anon, where it simply returns null.
+grant execute on function public.current_household() to anon, authenticated;
+grant execute on function public.is_admin() to authenticated;
+grant execute on function public.create_household(text) to authenticated;
+grant execute on function public.rename_household(uuid, text) to authenticated;
+grant execute on function public.delete_household(uuid) to authenticated;
+grant execute on function public.set_member_household(uuid, uuid) to authenticated;
+grant execute on function public.set_active_household(uuid) to authenticated;
+
 commit;
